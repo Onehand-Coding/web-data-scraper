@@ -58,7 +58,7 @@ web-data-scraper/
 
 1.  **Clone the repository (if applicable):**
     ```bash
-    git clone <your-repo-url>
+    git clone https://github.com/Phoenix1025/web-data-scraper.git
     cd web-data-scraper
     ```
 2.  **Create a Virtual Environment (Recommended):**
