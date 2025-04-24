@@ -1,12 +1,13 @@
-# File: web-data-scraper/interfaces/web_app/app.py (Verified with Import)
+# File: web-data-scraper/interfaces/web_app/app.py (Cleaned Indentation)
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, abort
 from pathlib import Path
 import yaml
-import json # Import json for parsing text area inputs
+import json
 import time
 import os
 import logging
+import re # Import re for regex matching
 from werkzeug.utils import secure_filename
 from datetime import datetime
 
@@ -17,9 +18,7 @@ from scraper.dynamic_scraper import DynamicScraper
 from scraper.storage.csv_handler import CSVStorage
 from scraper.storage.json_handler import JSONStorage
 from scraper.storage.sqlite_handler import SQLiteStorage
-# === Ensure this import is present ===
-from scraper.utils.logger import setup_logging
-# === End Ensure ===
+from scraper.utils.logger import setup_logging # Ensure this is present
 from scraper.utils.config_loader import ConfigLoader, ValidationError
 from jsonschema import ValidationError
 
@@ -32,8 +31,7 @@ app.config['UPLOAD_FOLDER'].mkdir(parents=True, exist_ok=True)
 app.config['OUTPUT_FOLDER'] = BASE_DIR / '..' / '..' / 'outputs'
 app.config['OUTPUT_FOLDER'].mkdir(parents=True, exist_ok=True)
 
-# Setup logging (ensure log files go to project's logs/ dir)
-# This line should now work as setup_logging is imported above
+# Setup logging
 setup_logging(log_filename='web_app.log', level=logging.INFO, console_level=logging.DEBUG if app.debug else logging.INFO)
 logger = logging.getLogger(__name__)
 config_loader = ConfigLoader()
@@ -56,7 +54,7 @@ def get_config_files_details():
         yaml_files = list(folder.glob('*.yaml'))
     except Exception as e:
         logger.error(f"Error reading config directory {folder}: {e}")
-        return [] # Return empty list on error
+        return []
 
     for f_path in yaml_files:
         try:
@@ -66,10 +64,9 @@ def get_config_files_details():
                 'modified_time': stat_result.st_mtime,
             })
         except Exception as e:
-             logger.warning(f"Could not get stats for file {f_path.name}: {e}")
-             configs.append({'name': f_path.name, 'modified_time': 0}) # Add with default time
+            logger.warning(f"Could not get stats for file {f_path.name}: {e}")
+            configs.append({'name': f_path.name, 'modified_time': 0})
 
-    # Sort by modified time, newest first
     configs.sort(key=lambda x: x.get('modified_time', 0), reverse=True)
     return configs
 
@@ -78,14 +75,12 @@ def get_config_files_details():
 # Index Route (List Configs)
 @app.route('/')
 def index():
-    """Render the main interface page and list existing configs."""
     config_files_details = get_config_files_details()
     upload_folder_path = "N/A"
     try:
-         # Show path relative to project root for clarity
         upload_folder_path = str(app.config['UPLOAD_FOLDER'].relative_to(Path.cwd()))
     except ValueError:
-         upload_folder_path = str(app.config['UPLOAD_FOLDER']) # Fallback to absolute path
+        upload_folder_path = str(app.config['UPLOAD_FOLDER'])
 
     return render_template('index.html',
                            config_files=config_files_details,
@@ -94,7 +89,6 @@ def index():
 # View Config Route
 @app.route('/view_config/<filename>')
 def view_config(filename):
-    """Display the content of a specific configuration file."""
     safe_filename = secure_filename(filename)
     if safe_filename != filename or not filename.endswith('.yaml'): abort(404)
     config_path = app.config['UPLOAD_FOLDER'] / safe_filename
@@ -109,7 +103,6 @@ def view_config(filename):
 # Delete Config Route
 @app.route('/delete_config/<filename>', methods=['POST'])
 def delete_config(filename):
-    """Delete a specific configuration file."""
     safe_filename = secure_filename(filename)
     if safe_filename != filename or not filename.endswith('.yaml'): abort(400)
     config_path = app.config['UPLOAD_FOLDER'] / safe_filename
@@ -123,7 +116,6 @@ def delete_config(filename):
 # Edit Config Route (Load into Form)
 @app.route('/edit_config/<filename>')
 def edit_config(filename):
-    """Load an existing config file and render the configuration form for editing."""
     safe_filename = secure_filename(filename)
     if safe_filename != filename or not filename.endswith('.yaml'): abort(404)
     config_path = app.config['UPLOAD_FOLDER'] / safe_filename
@@ -132,7 +124,7 @@ def edit_config(filename):
     try:
         config_data = config_loader.load_config(str(config_path))
         logger.info(f"Loading config '{safe_filename}' for editing.")
-        form_data = {} # Prepare data for template
+        form_data = {}
         job_type = config_data.get('job_type', 'web')
         form_data['job_type'] = job_type
         form_data['job_name'] = config_data.get('name', '')
@@ -163,33 +155,30 @@ def edit_config(filename):
             api_mappings = api_config.get('field_mappings', {}); form_data['api_field_mappings'] = json.dumps(api_mappings, indent=2) if api_mappings else ''
             defined_field_names = list(api_mappings.keys())
 
-        # Common fields population
         form_data['request_delay'] = config_data.get('request_delay', 1); form_data['max_retries'] = config_data.get('max_retries', 3);
         form_data['user_agent'] = config_data.get('user_agent', 'Python Scraper Framework / 1.0'); form_data['respect_robots'] = config_data.get('respect_robots', True)
 
-        # Format Processing Rules for Template
         processing_rules_raw = config_data.get('processing_rules', {})
-        # Field Types
         form_data['field_type_rules'] = []
         for field, type_info in processing_rules_raw.get('field_types', {}).items():
             if field not in defined_field_names: defined_field_names.append(field)
             form_data['field_type_rules'].append({'field': field, 'type': type_info.get('type'), 'format': type_info.get('format', '')})
-        # Text Cleaning
         form_data['text_cleaning_rules'] = []
         for field, clean_options in processing_rules_raw.get('text_cleaning', {}).items():
-             if field not in defined_field_names: defined_field_names.append(field)
-             form_data['text_cleaning_rules'].append({'field': field, 'options': clean_options})
-        # Validations
+            if field not in defined_field_names: defined_field_names.append(field)
+            form_data['text_cleaning_rules'].append({'field': field, 'options': clean_options})
         form_data['validation_rules'] = []
         for field, val_options in processing_rules_raw.get('validations', {}).items():
-             if field not in defined_field_names: defined_field_names.append(field)
-             form_data['validation_rules'].append({'field': field, 'options': val_options})
-        # Drop Fields
+            if field not in defined_field_names: defined_field_names.append(field)
+            form_data['validation_rules'].append({'field': field, 'options': val_options})
+        form_data['transformation_rules'] = []
+        for target_field, expression in processing_rules_raw.get('transformations', {}).items():
+            if target_field not in defined_field_names: defined_field_names.append(target_field)
+            form_data['transformation_rules'].append({'target_field': target_field, 'expression': expression})
         form_data['drop_field_rules'] = []
         for field in processing_rules_raw.get('drop_fields', []):
-             if field not in defined_field_names: defined_field_names.append(field)
-             form_data['drop_field_rules'].append({'field': field})
-        # TODO: Add formatting for transformations later
+            if field not in defined_field_names: defined_field_names.append(field)
+            form_data['drop_field_rules'].append({'field': field})
 
         form_data['defined_field_names'] = sorted(list(set(defined_field_names)))
         return render_template('configure.html', form_data=form_data)
@@ -203,12 +192,14 @@ def edit_config(filename):
 def configure_scraper():
     form_data_for_template = {}
     if request.method == 'POST':
+        logger.info(f"Received form data: {request.form.to_dict(flat=False)}") # Dump form data
         form_data_for_template = request.form.to_dict(flat=False);
         list_fields = ['urls', 'api_endpoints', 'api_params', 'api_headers', 'api_data', 'api_field_mappings']
         for key in list_fields: form_data_for_template[key] = request.form.get(key, '')
         form_data_for_template['dynamic'] = 'dynamic' in request.form; form_data_for_template['respect_robots'] = 'respect_robots' in request.form
         form_data_for_template['job_type'] = request.form.get('job_type', 'web'); form_data_for_template['selector_type'] = request.form.get('selector_type', 'css')
         form_data_for_template['api_method'] = request.form.get('api_method', 'GET')
+        # Add repopulation logic for dynamic rules if validation fails later
 
         try:
             job_type = request.form.get('job_type', 'web')
@@ -259,50 +250,84 @@ def configure_scraper():
                  if dp: api_conf['data_path'] = dp
                  config['api_config'] = api_conf
 
-            # Parse Structured Processing Rules
-            logger.debug("--- Parsing Processing Rules ---")
+            # --- Parse Structured Processing Rules ---
+            logger.info("--- Parsing Processing Rules ---")
             # Field Types
             ft_fields = request.form.getlist('ft_field[]'); ft_types = request.form.getlist('ft_type[]'); ft_formats = request.form.getlist('ft_format[]')
-            logger.debug(f"Received ft_field[]: {ft_fields}"); logger.debug(f"Received ft_type[]: {ft_types}"); logger.debug(f"Received ft_format[]: {ft_formats}")
+            logger.info(f"Received ft_field[]: {ft_fields}"); logger.info(f"Received ft_type[]: {ft_types}"); logger.info(f"Received ft_format[]: {ft_formats}")
             field_types_dict = {}
             for field, type_val, format_val in zip(ft_fields, ft_types, ft_formats):
-                 logger.debug(f"Processing ft zip: field='{field}', type='{type_val}', format='{format_val}'")
+                 logger.info(f"Processing ft zip: field='{field}', type='{type_val}', format='{format_val}'")
                  if field and type_val: field_types_dict[field] = {'type':type_val, **({'format':format_val.strip()} if format_val.strip() and type_val in ['datetime','date'] else {})}
             if field_types_dict: processing_rules['field_types'] = field_types_dict
             # Text Cleaning
-            text_cleaning_dict = {}; i = 0
-            while True:
-                field = request.form.get(f'tc_field_{i}');
-                if field is None: break
-                if field: options = { 'trim': request.form.get(f'tc_trim_{i}') == 'true', 'lowercase': request.form.get(f'tc_lowercase_{i}') == 'true', 'uppercase': request.form.get(f'tc_uppercase_{i}') == 'true', 'remove_newlines': request.form.get(f'tc_newlines_{i}') == 'true', 'remove_extra_spaces': request.form.get(f'tc_spaces_{i}') == 'true', 'remove_special_chars': request.form.get(f'tc_special_{i}') == 'true' }; text_cleaning_dict[field] = {k: v for k, v in options.items() if v}; logger.debug(f"Processing tc rule {i}: field='{field}', options={text_cleaning_dict[field]}")
-                i += 1
+            text_cleaning_dict = {};
+            tc_field_keys = [k for k in request.form if re.match(r'^tc_field_\d+$', k)]
+            logger.info(f"Found Text Cleaning field keys: {tc_field_keys}")
+            for key in tc_field_keys:
+                match = re.match(r'^tc_field_(\d+)$', key)
+                if match:
+                    index = match.group(1); field = request.form.get(key)
+                    if field:
+                        options = { 'trim': request.form.get(f'tc_trim_{index}') == 'true', 'lowercase': request.form.get(f'tc_lowercase_{index}') == 'true', 'uppercase': request.form.get(f'tc_uppercase_{index}') == 'true', 'remove_newlines': request.form.get(f'tc_newlines_{index}') == 'true', 'remove_extra_spaces': request.form.get(f'tc_spaces_{index}') == 'true', 'remove_special_chars': request.form.get(f'tc_special_{index}') == 'true' }
+                        active_options = {k: v for k, v in options.items() if v};
+                        if active_options: text_cleaning_dict[field] = active_options; logger.info(f"Processing tc rule index {index}: field='{field}', options={active_options}")
             if text_cleaning_dict: processing_rules['text_cleaning'] = text_cleaning_dict
             # Validations
-            validations_dict = {}; i = 0
-            while True:
-                 field = request.form.get(f'val_field_{i}')
-                 if field is None: break
-                 if field:
-                      rules = {}; required = request.form.get(f'val_required_{i}') == 'true'; min_len_str = request.form.get(f'val_min_length_{i}', '').strip(); max_len_str = request.form.get(f'val_max_length_{i}', '').strip(); pattern = request.form.get(f'val_pattern_{i}', '').strip()
-                      if required: rules['required'] = True
-                      if min_len_str.isdigit(): rules['min_length'] = int(min_len_str)
-                      if max_len_str.isdigit(): rules['max_length'] = int(max_len_str)
-                      if pattern: rules['pattern'] = pattern
-                      if rules: validations_dict[field] = rules; logger.debug(f"Processing val rule {i}: field='{field}', rules={rules}")
-                 i += 1
+            validations_dict = {};
+            val_field_keys = [k for k in request.form if re.match(r'^val_field_\d+$', k)]
+            logger.info(f"Found Validation field keys: {val_field_keys}")
+            for key in val_field_keys:
+                 match = re.match(r'^val_field_(\d+)$', key)
+                 if match:
+                      index = match.group(1); field = request.form.get(key)
+                      if field:
+                           rules = {}; required = request.form.get(f'val_required_{index}') == 'true'; min_len_str = request.form.get(f'val_min_length_{index}', '').strip(); max_len_str = request.form.get(f'val_max_length_{index}', '').strip(); pattern = request.form.get(f'val_pattern_{index}', '').strip()
+                           if required: rules['required'] = True
+                           if min_len_str.isdigit(): rules['min_length'] = int(min_len_str)
+                           if max_len_str.isdigit(): rules['max_length'] = int(max_len_str)
+                           if pattern: rules['pattern'] = pattern
+                           if rules: validations_dict[field] = rules; logger.info(f"Processing val rule index {index}: field='{field}', rules={rules}")
             if validations_dict: processing_rules['validations'] = validations_dict
+            # Transformations (Robust Loop with INFO Debugging)
+            transformations_dict = {}; i = 0
+            logger.info("--- Parsing Transformations ---")
+            # Find all submitted transformation target field keys first
+            tr_target_keys = sorted([k for k in request.form if re.match(r'^tr_target_field_\d+$', k)], key=lambda x: int(re.search(r'_(\d+)$', x).group(1)))
+            logger.info(f"Found Transformation field keys: {tr_target_keys}")
+            for target_field_key in tr_target_keys:
+                 match = re.match(r'^tr_target_field_(\d+)$', target_field_key)
+                 if not match: continue # Should not happen if regex is correct
+                 index = match.group(1)
+                 expression_key = f'tr_expression_{index}'
+
+                 target_field = request.form.get(target_field_key, '').strip()
+                 expression = request.form.get(expression_key, '').strip()
+                 logger.info(f"Read transformation rule index {index}: target='{target_field}', expression='{expression[:100]}...'")
+
+                 if target_field and expression:
+                      transformations_dict[target_field] = expression
+                      logger.info(f"ADDED transformation rule index {index}")
+                 elif target_field or expression:
+                     logger.warning(f"Transformation rule index {index} skipped: Both target field ('{target_field}') and expression ('{expression[:50]}...') are required.")
+                 # No else needed, if both empty, just skip
+
+            logger.info(f"Finished parsing transformations. Dict: {transformations_dict}")
+            if transformations_dict:
+                 processing_rules['transformations'] = transformations_dict
+
             # Drop Fields
             df_fields = request.form.getlist('df_field[]')
-            logger.debug(f"Received df_field[]: {df_fields}")
+            logger.info(f"Received df_field[]: {df_fields}")
             drop_fields_list = [field for field in df_fields if field]
             if drop_fields_list: processing_rules['drop_fields'] = drop_fields_list
             # --- End Rule Parsing ---
 
-            logger.debug(f"Constructed processing_rules dict: {processing_rules}")
+            logger.info(f"Constructed processing_rules dict: {processing_rules}")
             if processing_rules: config['processing_rules'] = processing_rules
-            else: logger.debug("Processing_rules dict empty.")
+            else: logger.info("Processing_rules dict empty.")
 
-            logger.debug(f"Final config dictionary before validation: {config}")
+            logger.info(f"Final config dictionary before validation: {config}")
             config_loader.validate_config(config)
 
             safe_job_name = secure_filename(config['name']); timestamp = int(time.time()); config_filename = f"{safe_job_name}-{timestamp}.yaml"; config_path = app.config['UPLOAD_FOLDER'] / config_filename
@@ -326,21 +351,26 @@ def run_scraper(config_file):
     try:
         config = config_loader.load_config(str(config_path)); logger.debug(f"Loaded config: {config}")
         job_type = config.get('job_type', 'web')
-        output_format = config.get('output_format', 'csv')
+        output_format = request.args.get('format', 'csv')
+
         output_base_dir = Path(config.get('output_dir', str(app.config['OUTPUT_FOLDER'])))
         job_output_dir = output_base_dir / Path(safe_filename).stem; job_output_dir.mkdir(parents=True, exist_ok=True)
-        config['output_dir'] = str(job_output_dir)
+        config_for_run = config.copy()
+        config_for_run['output_dir'] = str(job_output_dir)
+
         scraper_instance = None
-        if job_type == 'api': logger.info("Using APIScraper"); scraper_instance = APIScraper(config)
+        if job_type == 'api': logger.info("Using APIScraper"); scraper_instance = APIScraper(config_for_run)
         elif job_type == 'web':
-             if config.get('dynamic', False): scraper_instance = DynamicScraper(config)
-             else: scraper_instance = HTMLScraper(config)
+             if config_for_run.get('dynamic', False): scraper_instance = DynamicScraper(config_for_run)
+             else: scraper_instance = HTMLScraper(config_for_run)
              logger.info(f"Using {scraper_instance.__class__.__name__}")
         else: raise ValueError(f"Invalid job_type '{job_type}' found.")
+
         result = scraper_instance.run(); logger.info(f"Run completed. Stats: {result.get('stats')}")
         output_path_str = ""
         if result.get('data'):
-            storage = None; output_format_lower = output_format.lower(); storage_config = config.copy()
+            storage = None; output_format_lower = output_format.lower()
+            storage_config = config_for_run
             if output_format_lower == 'csv': storage = CSVStorage(storage_config)
             elif output_format_lower == 'json': storage = JSONStorage(storage_config)
             elif output_format_lower == 'sqlite': storage = SQLiteStorage(storage_config)
@@ -351,8 +381,8 @@ def run_scraper(config_file):
         try: relative_path = Path(output_path_str).relative_to(Path.cwd())
         except (ValueError, TypeError): relative_path = Path(output_path_str).name if output_path_str else "N/A"
         return render_template('results.html', job_name=config.get('name', safe_filename), output_path=str(relative_path), output_format=output_format.upper(), stats=result.get('stats',{}), sample_data=result.get('data',[])[:10])
-    except (ValidationError, yaml.YAMLError) as e: error_path = " -> ".join(map(str, e.path)) or "Config root"; message = f"Config Error: {e.message} (at {error_path})"; logger.error(message); flash(message, 'error'); return redirect(url_for('index'))
-    except Exception as e: logger.exception(f"Error running job {safe_filename}: {e}"); flash(f"Scraping failed: {e}", 'error'); return render_template('error.html', error=str(e), config_file=safe_filename)
+    except (ValidationError, yaml.YAMLError) as e: error_path = " -> ".join(map(str, e.path)) or "Config root"; message = f"Config Error running job {safe_filename}: {e.message} (at {error_path})"; logger.error(message); flash(message, 'error'); return redirect(url_for('index'))
+    except Exception as e: logger.exception(f"Error running job {safe_filename}: {e}"); flash(f"Scraping failed for job '{config.get('name', safe_filename)}': {e}", 'error'); return render_template('error.html', error=str(e), config_file=safe_filename)
 
 
 if __name__ == '__main__':
