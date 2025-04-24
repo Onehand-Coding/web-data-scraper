@@ -1,4 +1,4 @@
-# File: web-data-scraper/scraper/data_processor.py (Corrected SyntaxError on line 125)
+# File: web-data-scraper/scraper/data_processor.py (Corrected)
 
 from typing import Dict, List, Any
 import re
@@ -81,12 +81,20 @@ class DataProcessor:
 
         # 3. Field transformations
         transformed_values = {}
-        safe_builtins = { "len": len, "str": str, "int": int, "float": float, "list": list, "dict": dict, "set": set, "tuple": tuple, "abs": abs, "round": round, "max": max, "min": min, "sum": sum, "true": True, "false": False, "none": None }
+        # --- ADD isinstance TO SAFE BUILTINS ---
+        safe_builtins = {
+            "len": len, "str": str, "int": int, "float": float,
+            "list": list, "dict": dict, "set": set, "tuple": tuple,
+            "abs": abs, "round": round, "max": max, "min": min, "sum": sum,
+            "true": True, "false": False, "none": None,
+            "isinstance": isinstance # <-- ADDED HERE
+        }
         context = {'value': None, 'item': item, 're': re, 'datetime': datetime, 'date': date}
 
         for target_field, transform_expression in rules.get('transformations', {}).items():
-             context['value'] = item.get(target_field) # Update context
+             context['value'] = item.get(target_field) # Update context with the field's current value
              try:
+                  # Evaluate the expression within the restricted environment
                   result = eval(transform_expression, {"__builtins__": safe_builtins}, context)
                   transformed_values[target_field] = result
                   # self.logger.debug(f"Field '{target_field}': Transformed. Result: {result}")
@@ -113,33 +121,64 @@ class DataProcessor:
             if target_type == 'string': return str(value).strip()
             elif target_type == 'int':
                 if isinstance(value, str):
+                    # Remove non-digit characters except leading hyphen
                     cleaned_value = re.sub(r'[^\d-]', '', value)
-                    return int(cleaned_value) if cleaned_value else None
+                    # Handle potential empty string after cleaning
+                    return int(cleaned_value) if cleaned_value and cleaned_value != '-' else None
                 elif isinstance(value, (int, float)):
                     return int(value) # Correctly handles float -> int truncation
                 else:
+                    self.logger.debug(f"Cannot convert type {type(value)} to int for value '{value}'")
                     return None # Cannot convert other types to int directly
             elif target_type == 'float':
                  if isinstance(value, str):
+                      # Remove non-digit characters except decimal point and leading hyphen
                       cleaned_value = re.sub(r'[^\d.-]', '', value)
-                      if cleaned_value.count('.') > 1: cleaned_value = cleaned_value.replace('.', '', cleaned_value.count('.') - 1)
-                      return float(cleaned_value) if cleaned_value and cleaned_value != '.' else None
+                      # Ensure only one decimal point remains if multiple are present
+                      if cleaned_value.count('.') > 1:
+                          parts = cleaned_value.split('.')
+                          cleaned_value = parts[0] + '.' + "".join(parts[1:])
+                      # Handle potential empty string or just '.' or '-' after cleaning
+                      return float(cleaned_value) if cleaned_value and cleaned_value not in ['.', '-'] else None
                  elif isinstance(value, (int, float)):
                      return float(value)
                  else:
+                      self.logger.debug(f"Cannot convert type {type(value)} to float for value '{value}'")
                       return None
             elif target_type == 'boolean':
+                # Handle boolean conversion more robustly
+                if isinstance(value, bool): return value
                 if isinstance(value, (int, float)): return bool(value)
-                return str(value).lower().strip() in ('true', '1', 'yes', 'y', 'on')
+                if isinstance(value, str):
+                    return value.lower().strip() in ('true', '1', 'yes', 'y', 'on')
+                return False # Default to False for other types or None
             elif target_type == 'datetime':
                  if isinstance(value, datetime): return value
-                 return datetime.strptime(str(value).strip(), format_str) if format_str else datetime.fromisoformat(str(value).strip())
+                 # Try parsing with format string first, then ISO format
+                 try:
+                     return datetime.strptime(str(value).strip(), format_str) if format_str else datetime.fromisoformat(str(value).strip())
+                 except ValueError:
+                     self.logger.warning(f"Failed datetime conversion for '{value}' with format '{format_str}'. Trying ISO format or returning None.")
+                     try:
+                          # Attempt ISO format as a fallback if no format or format failed
+                          return datetime.fromisoformat(str(value).strip())
+                     except ValueError:
+                          return None # Give up if both fail
             elif target_type == 'date':
                  if isinstance(value, date): return value
                  if isinstance(value, datetime): return value.date()
-                 return datetime.strptime(str(value).strip(), format_str).date() if format_str else date.fromisoformat(str(value).strip())
+                 # Try parsing with format string first, then ISO format
+                 try:
+                     return datetime.strptime(str(value).strip(), format_str).date() if format_str else date.fromisoformat(str(value).strip())
+                 except ValueError:
+                      self.logger.warning(f"Failed date conversion for '{value}' with format '{format_str}'. Trying ISO format or returning None.")
+                      try:
+                          # Attempt ISO format as a fallback if no format or format failed
+                           return date.fromisoformat(str(value).strip())
+                      except ValueError:
+                           return None # Give up if both fail
             else:
-                 self.logger.warning(f"Unknown target type '{target_type}'.")
+                 self.logger.warning(f"Unknown target type '{target_type}'. Returning original value.")
                  return value
         except (ValueError, TypeError) as e:
             self.logger.warning(f"Type conversion failed for '{value}' to '{target_type}' (Format: {format_str}): {e}")
@@ -148,32 +187,70 @@ class DataProcessor:
 
     def _clean_text(self, text: str, rules: Dict) -> str:
         """Clean text according to rules."""
-        if not isinstance(text, str): return text
+        if not isinstance(text, str): return text # Return non-strings as is
         cleaned_text = text;
-        if rules.get('trim', True): cleaned_text = cleaned_text.strip()
-        if rules.get('lowercase'): cleaned_text = cleaned_text.lower()
-        if rules.get('uppercase'): cleaned_text = cleaned_text.upper()
-        if rules.get('remove_newlines', True): cleaned_text = re.sub(r'[\r\n]+', ' ', cleaned_text)
-        if rules.get('remove_extra_spaces', True): cleaned_text = ' '.join(cleaned_text.split())
-        if rules.get('remove_special_chars'): cleaned_text = re.sub(r'[^\w\s-]', '', cleaned_text, flags=re.UNICODE)
-        if rules.get('regex_replace'):
-            if isinstance(rules['regex_replace'], dict):
-                 for pattern, replacement in rules['regex_replace'].items():
-                      try: cleaned_text = re.sub(pattern, replacement, cleaned_text)
-                      except re.error as e: self.logger.error(f"Invalid regex pattern '{pattern}': {e}")
-            else: self.logger.error("'regex_replace' must be a dict.")
+        # Apply rules only if they are True in the config
+        if rules.get('trim', True): cleaned_text = cleaned_text.strip() # Default True
+        if rules.get('lowercase', False): cleaned_text = cleaned_text.lower() # Default False
+        if rules.get('uppercase', False): cleaned_text = cleaned_text.upper() # Default False
+        if rules.get('remove_newlines', True): cleaned_text = re.sub(r'[\r\n]+', ' ', cleaned_text) # Default True
+        if rules.get('remove_extra_spaces', True): cleaned_text = ' '.join(cleaned_text.split()) # Default True
+        if rules.get('remove_special_chars', False): # Default False
+             # Keep letters, numbers, whitespace, and hyphen (common in many contexts)
+             cleaned_text = re.sub(r'[^\w\s-]', '', cleaned_text, flags=re.UNICODE)
+        # Regex Replace (Ensure it's a dictionary)
+        regex_replace_rules = rules.get('regex_replace', {}) # Default to empty dict
+        if isinstance(regex_replace_rules, dict):
+            for pattern, replacement in regex_replace_rules.items():
+                 try:
+                     # Make sure replacement is a string
+                     cleaned_text = re.sub(pattern, str(replacement), cleaned_text)
+                 except re.error as e:
+                      self.logger.error(f"Invalid regex pattern '{pattern}': {e}")
+                 except TypeError:
+                     self.logger.error(f"Replacement for pattern '{pattern}' must be a string, not {type(replacement)}.")
+        elif regex_replace_rules: # If it exists but isn't a dict
+             self.logger.error(f"'regex_replace' rule must be a dictionary, but got {type(regex_replace_rules)}.")
+
         return cleaned_text
+
 
     def _validate_field(self, value: Any, validation: Dict) -> bool:
         """Validate field against rules."""
-        if validation.get('required') and value in (None, '', [], {}): return False
-        if value is not None:
-            str_value = str(value)
-            if 'min_length' in validation and len(str_value) < validation['min_length']: return False
-            if 'max_length' in validation and len(str_value) > validation['max_length']: return False
+        # Check required first
+        is_empty = value in (None, '', [], {})
+        if validation.get('required') and is_empty:
+            self.logger.debug(f"Validation failed: Field is required but empty/None.")
+            return False
+
+        # Skip other checks if the value is None/empty and not required
+        if is_empty:
+             return True
+
+        # Perform other checks only if value is not empty
+        try:
+            str_value = str(value) # Convert to string for length/pattern checks
+            if 'min_length' in validation:
+                min_len = int(validation['min_length'])
+                if len(str_value) < min_len:
+                     self.logger.debug(f"Validation failed: Length {len(str_value)} < min_length {min_len}.")
+                     return False
+            if 'max_length' in validation:
+                max_len = int(validation['max_length'])
+                if len(str_value) > max_len:
+                     self.logger.debug(f"Validation failed: Length {len(str_value)} > max_length {max_len}.")
+                     return False
             if 'pattern' in validation:
                  pattern = validation['pattern']
-                 try:
-                      if not re.match(pattern, str_value): return False
-                 except re.error as e: self.logger.error(f"Invalid regex '{pattern}': {e}"); return False
-        return True
+                 if not re.match(pattern, str_value):
+                      self.logger.debug(f"Validation failed: Value '{str_value[:50]}...' does not match pattern '{pattern}'.")
+                      return False
+        except (ValueError, TypeError) as e:
+             # Handle cases where min/max_length is not a valid number in config
+             self.logger.error(f"Invalid validation rule config: {e}. Rule: {validation}")
+             return False # Fail validation if rules are bad
+        except re.error as e:
+             self.logger.error(f"Invalid regex pattern '{validation.get('pattern')}' in validation rules: {e}")
+             return False # Fail validation if pattern is bad
+
+        return True # Passed all checks

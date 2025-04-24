@@ -1,7 +1,8 @@
-# File: web-data-scraper/scraper/api_scraper.py
+# File: web-data-scraper/scraper/api_scraper.py (Corrected)
+
 import time
 import requests
-from typing import Dict, List, Optional, Any # Added Any
+from typing import Dict, List, Optional, Any
 from .base_scraper import BaseScraper
 # import json # Not needed here
 
@@ -15,7 +16,6 @@ def get_nested_value(data_dict: Dict, key_path: str, default: Any = None) -> Any
             if isinstance(current_value, dict):
                 current_value = current_value.get(key)
             elif isinstance(current_value, list):
-                 # Handle cases like 'list.0.key' - requires parsing index
                  try:
                      key_index = int(key)
                      if 0 <= key_index < len(current_value):
@@ -28,7 +28,7 @@ def get_nested_value(data_dict: Dict, key_path: str, default: Any = None) -> Any
             if current_value is None:
                  return default # Path doesn't exist fully
         return current_value
-    except Exception: # Catch any unexpected errors during traversal
+    except Exception:
         return default
 # --- End Helper ---
 
@@ -41,58 +41,53 @@ class APIScraper(BaseScraper):
         self.api_config = config.get('api_config', {})
         if not self.api_config:
             self.logger.error("API Scraper initialized without 'api_config' in configuration!")
-            # Consider raising an error here?
 
-    def fetch_data(self, endpoint: str, params: Optional[Dict] = None) -> Optional[Any]: # Return Any, could be list or dict
+    def fetch_data(self, endpoint: str, params: Optional[Dict] = None) -> Optional[Any]:
         """Fetch data from API endpoint."""
-        # Ensure api_config is present
         if not self.api_config.get('base_url'):
              self.logger.error("API base_url is missing in configuration.")
              return None
 
-        self.throttle_requests() # Use delay from base config
-        url = self.api_config['base_url'].rstrip('/') + '/' + endpoint.lstrip('/')
+        # --- Use BaseScraper's fetch_page which handles proxies/retries ---
+        # Construct full URL
+        base_url = self.api_config['base_url'].rstrip('/')
+        full_url = f"{base_url}/{endpoint.lstrip('/')}"
 
+        # Prepare parameters (requests handles adding these to the URL for GET)
+        request_params = params or self.api_config.get('params')
+
+        # Prepare headers
         headers = self.api_config.get('headers', {})
-        # Ensure User-Agent from base config is used if no specific one in API headers
-        headers.setdefault('User-Agent', self.session.headers['User-Agent'])
+        headers.setdefault('User-Agent', self.session.headers['User-Agent']) # Use session UA if not specified
 
-        try:
-            self.logger.info(f"Making API request: {self.api_config.get('method', 'GET')} {url}")
-            response = self.session.request(
-                method=self.api_config.get('method', 'GET'),
-                url=url,
-                params=params or self.api_config.get('params'), # Combine/prioritize params if needed
-                headers=headers,
-                json=self.api_config.get('data', None) # Assumes JSON body if 'data' provided
-            )
-            self.logger.debug(f"API Response Status: {response.status_code}")
-            response.raise_for_status() # Check for HTTP errors
-            self.stats['pages_scraped'] += 1 # Count API calls as 'pages'
-            # Check content type before trying to parse JSON
-            content_type = response.headers.get('content-type', '').lower()
-            if 'application/json' in content_type:
-                 return response.json()
-            else:
-                 self.logger.warning(f"API response Content-Type is not JSON ({content_type}). Returning raw text.")
-                 return response.text # Return text for non-JSON responses
+        # Prepare data (for POST/PUT etc.) - fetch_page uses session.get,
+        # so this part needs adjustment if POST/PUT is required.
+        # For now, assuming GET which is handled by fetch_page.
+        request_data = self.api_config.get('data')
+        if request_data and self.api_config.get('method', 'GET').upper() != 'GET':
+             self.logger.warning("API scraper currently uses BaseScraper.fetch_page (GET). 'data' field ignored.")
+             # TODO: Implement POST/PUT etc. directly if needed, bypassing fetch_page or enhancing it.
 
-        except requests.exceptions.HTTPError as e:
-             self.logger.error(f"API request failed for {url}: HTTP {e.response.status_code} - {e.response.text[:200]}") # Log beginning of error response
-             self.stats['pages_failed'] += 1
-             return None
-        except requests.exceptions.RequestException as e:
-            self.logger.error(f"API request failed for {url}: {e}")
-            self.stats['pages_failed'] += 1
+        # Use fetch_page from BaseScraper - it handles retries and proxies via the session
+        # Note: fetch_page returns the *text* content. We need to parse JSON.
+        response_text = super().fetch_page(full_url) # Inherits proxy logic
+
+        if response_text:
+            try:
+                # Attempt to parse JSON
+                return json.loads(response_text)
+            except json.JSONDecodeError as e:
+                self.logger.error(f"Failed to decode JSON response from {full_url}: {e}")
+                self.logger.debug(f"Response text was: {response_text[:500]}") # Log response start
+                # Consider if we should count this as a page failure in stats?
+                # BaseScraper already counted the successful fetch.
+                return None # Return None if JSON parsing fails
+        else:
+            # Fetch failed (logged in base_scraper)
             return None
-        except ValueError as e: # Catches JSONDecodeError
-             self.logger.error(f"Failed to decode JSON response from {url}: {e}")
-             self.logger.debug(f"Response text: {response.text[:500]}") # Log response start
-             self.stats['pages_failed'] += 1
-             return None
 
 
-    def extract_data(self, response_data: Any) -> List[Dict]:
+    def extract_data(self, response_data: Any, url: str = "N/A") -> List[Dict]: # Added url param for consistency
         """Extract and transform API response data."""
         items = []
         processed_items = []
@@ -105,31 +100,25 @@ class APIScraper(BaseScraper):
             data_to_process = response_data
             data_path = self.api_config.get('data_path')
 
-            # --- Navigate to the list/object containing the items ---
             if data_path:
                  self.logger.debug(f"Accessing data path: {data_path}")
                  data_to_process = get_nested_value(response_data, data_path)
                  if data_to_process is None:
                       self.logger.warning(f"Data path '{data_path}' resulted in None.")
-                      data_to_process = [] # Process empty list if path invalid
+                      data_to_process = []
 
-            # --- Ensure we have a list to iterate over ---
             if isinstance(data_to_process, list):
                 items = data_to_process
                 self.logger.debug(f"Found {len(items)} items at data path '{data_path or 'root'}'.")
             elif isinstance(data_to_process, dict):
-                 # If data_path pointed to a single object, wrap it in a list
                  items = [data_to_process]
                  self.logger.debug(f"Data at path '{data_path}' is a single object, processing as one item.")
             else:
-                self.logger.warning(f"Data found at path '{data_path or 'root'}' is not a list or dictionary, cannot extract items (Type: {type(data_to_process)}).")
-                return [] # Cannot process non-list/dict data
+                self.logger.warning(f"Data found at path '{data_path or 'root'}' is not a list or dictionary (Type: {type(data_to_process)}).")
+                return []
 
-            # --- Apply field mappings ---
             field_mappings = self.api_config.get('field_mappings')
             if not field_mappings:
-                 # If no mappings, assume items are already dicts with desired structure
-                 # Filter out non-dict items just in case
                  processed_items = [item for item in items if isinstance(item, dict)]
                  if len(processed_items) != len(items):
                       self.logger.warning("Some items in the API response were not dictionaries and were skipped.")
@@ -138,26 +127,22 @@ class APIScraper(BaseScraper):
                  for i, item in enumerate(items):
                     if not isinstance(item, dict):
                          self.logger.warning(f"Skipping item {i+1} as it is not a dictionary (type: {type(item)}).")
-                         continue # Skip non-dict items
+                         continue
                     mapped_item = {}
                     for target_field, source_path in field_mappings.items():
-                        # Use helper function for potentially nested source paths
                         mapped_item[target_field] = get_nested_value(item, source_path)
                     processed_items.append(mapped_item)
 
-            # Note: self.stats is updated in _process_extracted_data in BaseScraper now
-            # self.stats['items_collected'] += len(processed_items) # Update count based on successfully processed items
             return processed_items
 
         except Exception as e:
-            # Log the actual error encountered
-            self.logger.error(f"API data extraction failed: {e}", exc_info=True) # Log traceback
-            return [] # Return empty list on failure
+            self.logger.error(f"API data extraction failed: {e}", exc_info=True)
+            return []
 
 
     def run(self) -> Dict:
         """Execute API scraping job."""
-        super().run() # Sets start time
+        self.stats['start_time'] = time.time() # Reset start time directly
         all_extracted_data = []
         endpoints = self.api_config.get('endpoints', [])
 
@@ -167,22 +152,23 @@ class APIScraper(BaseScraper):
             return {'data': [], 'stats': self.get_stats(), 'config': self.config}
 
         for endpoint in endpoints:
-            # Params can be defined globally or per-endpoint if needed later
-            # For now, using global params for all endpoints
-            response_data = self.fetch_data(endpoint) # Fetches data
+             # Construct full URL for context in extract_data (though not strictly needed by it now)
+             base_url = self.api_config['base_url'].rstrip('/')
+             full_url = f"{base_url}/{endpoint.lstrip('/')}"
 
-            if response_data:
-                page_data = self.extract_data(response_data) # Extracts data
-                all_extracted_data.extend(page_data)
-                # Log inside extract_data now
-                # self.logger.info(f"Collected {len(page_data)} items from {endpoint}")
+             # Fetch data using the modified fetch_data method which calls base_scraper.fetch_page
+             response_data = self.fetch_data(endpoint)
 
-        # --- Process all collected data at the end ---
+             if response_data:
+                 # Pass the full URL for context if extract_data needs it
+                 page_data = self.extract_data(response_data, full_url)
+                 all_extracted_data.extend(page_data)
+
         processed_data = self._process_extracted_data(all_extracted_data)
 
         self.stats['end_time'] = time.time()
         return {
-            'data': processed_data, # Return processed data
+            'data': processed_data,
             'stats': self.get_stats(),
             'config': self.config
         }

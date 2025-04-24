@@ -1,13 +1,15 @@
-# File: web-data-scraper/scraper/utils/config_loader.py
+# File: web-data-scraper/scraper/utils/config_loader.py (Corrected)
 
 import yaml
-from typing import Dict, Any
+from typing import Dict, Any, List
 from pathlib import Path
 import logging
 from jsonschema import validate, ValidationError
 # import json # Not needed directly
 
-# --- Added definition for api_config schema ---
+# --- Define Schemas *BEFORE* the Class ---
+
+# --- API Config Schema ---
 API_CONFIG_SCHEMA = {
     "type": "object",
     "properties": {
@@ -20,7 +22,7 @@ API_CONFIG_SCHEMA = {
         },
         "method": {
             "type": "string",
-            "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"], # Add other methods if needed
+            "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"],
             "default": "GET",
             "description": "HTTP method for the request"
         },
@@ -36,25 +38,24 @@ API_CONFIG_SCHEMA = {
             "additionalProperties": {"type": "string"},
             "description": "Mapping from desired output field name to source field name in API response item"
         },
-        "pagination": { # API Pagination (can be different from web) - Placeholder for now
+        "pagination": {
              "type": "object",
              "properties": {
                  "type": {"type": "string", "enum": ["page_param", "next_url", "offset_limit"]},
-                 # Define specific pagination strategy params later
              },
              "description": "(Future) Define API pagination strategy"
         }
     },
-    "required": ["base_url", "endpoints"], # Base requirements for API config
+    "required": ["base_url", "endpoints"],
     "additionalProperties": False
 }
 
-# --- Definition for web selectors config ---
+# --- Web Selectors Schema ---
 WEB_SELECTORS_SCHEMA = {
     "type": "object",
     "properties": {
         "type": {"type": "string", "enum": ["css", "xpath"], "default": "css"},
-        "container": {"type": "string"}, # Keep optional
+        "container": {"type": "string"},
         "item": {"type": "string"},
         "fields": {
             "type": "object",
@@ -75,25 +76,41 @@ WEB_SELECTORS_SCHEMA = {
             }
         }
     },
-    "required": ["item", "fields"], # Item and fields are required for web scraping
+    "required": ["item", "fields"],
     "additionalProperties": False
 }
 
-# --- Definition for web pagination config ---
+# --- Web Pagination Schema ---
 WEB_PAGINATION_SCHEMA = {
     "type": "object",
     "properties": {
         "next_page_selector": {"type": "string"},
         "max_pages": {"type": "integer", "minimum": 1}
     },
-    "required": ["next_page_selector"],
+    # "required": ["next_page_selector"], # Making this optional as pagination might not always be needed/present
     "additionalProperties": False
 }
+
+# --- Proxy Item Schema ---
+PROXY_ITEM_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "http": {"type": "string", "format": "uri", "pattern": r"^http(s)?://"},
+        "https": {"type": "string", "format": "uri", "pattern": r"^http(s)?://"}
+    },
+    "anyOf": [
+        {"required": ["http"]},
+        {"required": ["https"]}
+    ],
+    "additionalProperties": False,
+    "description": "Proxy server details for HTTP and/or HTTPS protocols."
+}
+
+# --- Now Define the Class ---
 
 class ConfigLoader:
     """Handles loading and validation of scraping configurations."""
 
-    # --- Updated CONFIG_SCHEMA ---
     CONFIG_SCHEMA = {
         "type": "object",
         "properties": {
@@ -107,28 +124,27 @@ class ConfigLoader:
             },
 
             # --- Web Scraping Specific ---
-            "urls": { # Required for web scraping
+            "urls": {
                 "type": "array",
                 "items": {"type": "string", "format": "uri"},
                 "description": "List of starting URLs (for job_type: web)"
             },
             "dynamic": {"type": "boolean", "default": False, "description": "Use Selenium for JS rendering (for job_type: web)"},
-            "selectors": WEB_SELECTORS_SCHEMA, # Use defined schema (for job_type: web)
-            "pagination": WEB_PAGINATION_SCHEMA, # Use defined schema (for job_type: web)
-             "wait_for_selector": {"type": "string", "description": "Wait for this CSS selector (for dynamic web)"},
-             "headless": {"type": "boolean", "default": True, "description": "Run headless browser (for dynamic web)"},
-             "disable_images": {"type": "boolean", "default": True, "description": "Disable images (for dynamic web)"},
-             "page_load_timeout": {"type": "integer", "minimum": 5, "default": 30, "description": "Page load timeout in seconds (for dynamic web)"},
-             "wait_time": {"type": "number", "minimum": 0, "default": 5, "description": "General wait time after load (for dynamic web)"},
+            "selectors": WEB_SELECTORS_SCHEMA,
+            "pagination": WEB_PAGINATION_SCHEMA,
+            "wait_for_selector": {"type": "string", "description": "Wait for this CSS selector (for dynamic web)"},
+            "headless": {"type": "boolean", "default": True, "description": "Run headless browser (for dynamic web)"},
+            "disable_images": {"type": "boolean", "default": True, "description": "Disable images (for dynamic web)"},
+            "page_load_timeout": {"type": "integer", "minimum": 5, "default": 30, "description": "Page load timeout in seconds"},
+            "wait_time": {"type": "number", "minimum": 0, "default": 5, "description": "General wait time after load (for dynamic web)"},
 
 
             # --- API Specific ---
-            "api_config": API_CONFIG_SCHEMA, # Use defined schema (for job_type: api)
+            "api_config": API_CONFIG_SCHEMA,
 
             # --- Common / General ---
-            "processing_rules": { # Shared processing rules
+            "processing_rules": {
                 "type": "object",
-                # (Keep existing detailed definition from previous steps)
                  "properties": {
                      "field_types": {"type": "object", "additionalProperties": {"type": "object", "properties": {"type": {"type": "string", "enum": ["int", "float", "string", "boolean", "datetime", "date"]}, "format": {"type": "string"}}, "required": ["type"], "additionalProperties": False}},
                      "text_cleaning": {"type": "object", "additionalProperties": {"type": "object", "properties": {"trim": {"type": "boolean", "default": True}, "lowercase": {"type": "boolean", "default": False}, "uppercase": {"type": "boolean", "default": False}, "remove_newlines": {"type": "boolean", "default": True}, "remove_extra_spaces": {"type": "boolean", "default": True}, "remove_special_chars": {"type": "boolean", "default": False}, "regex_replace": {"type": "object", "additionalProperties": {"type": "string"}}}, "additionalProperties": False}},
@@ -141,12 +157,15 @@ class ConfigLoader:
             "output_dir": {"type": "string", "default": "outputs"},
             "request_delay": {"type": "number", "minimum": 0, "default": 1},
             "max_retries": {"type": "integer", "minimum": 0, "default": 3},
-            "user_agent": {"type": "string"}, # Can be used for API requests too
-            "respect_robots": {"type": "boolean", "default": True} # Less relevant for APIs usually
+            "user_agent": {"type": "string"},
+            "respect_robots": {"type": "boolean", "default": True},
+            "proxies": {
+                "type": "array",
+                "items": PROXY_ITEM_SCHEMA,
+                "description": "List of proxies to use for requests. Each item must be an object with 'http' and/or 'https' keys.",
+                "default": []
+            }
         },
-        # --- Conditional Requirements using 'if/then' ---
-        # Note: 'if/then' requires jsonschema draft 7 or later.
-        # Ensure your jsonschema library version supports this.
         "allOf": [
             {
                 "if": {
@@ -165,21 +184,18 @@ class ConfigLoader:
                  }
              }
         ],
-        # Fallback required if no job_type specified (defaults to web)
-        "required": ["name"] # Only name is universally required
+        "required": ["name"]
     }
-    # --- End of CONFIG_SCHEMA ---
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
     def load_config(self, config_path: str) -> Dict[str, Any]:
-        # ... (Keep existing load_config method, validation will now use the updated schema) ...
         config = {}
         try:
             config = self._load_yaml(config_path)
-            # Apply default job_type if missing before validation
             config.setdefault('job_type', 'web')
+            config.setdefault('proxies', []) # Ensure proxies key exists
             self.validate_config(config)
             self.logger.info(f"Configuration loaded and validated: {config_path}")
             return config
@@ -188,7 +204,6 @@ class ConfigLoader:
         except ValidationError as e:
             error_path = " -> ".join(map(str, e.path)) or "root"; msg = f"Config validation error in {config_path} at '{error_path}': {e.message}"
             self.logger.error(msg); self.logger.debug(f"Schema context: {e.schema}"); raise
-
 
     def _load_yaml(self, file_path: str) -> Dict[str, Any]:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -199,14 +214,10 @@ class ConfigLoader:
         return True
 
     def generate_sample_config(self, output_path: str) -> None:
-        # Now generates either web or api sample based on filename? Or just web?
-        # Let's generate a web sample by default. User can adapt it for API.
-        # (Or create two generation commands later)
-        # Sample config below is for WEB scraping (includes pagination)
         sample_config = {
             "name": "Sample Web Scraper Job",
-            "description": "Example config for scraping a multi-page website",
-            "job_type": "web", # Specify job type
+            "description": "Example config for scraping a multi-page website with proxy support",
+            "job_type": "web",
             "urls": ["https://quotes.toscrape.com/"],
             "dynamic": False,
             "selectors": {
@@ -219,46 +230,45 @@ class ConfigLoader:
             "pagination": {
                 "next_page_selector": "li.next a", "max_pages": 3
             },
+            "proxies": [
+                 {'http': 'http://user1:pass1@proxy.example.com:8080', 'https': 'http://user1:pass1@proxy.example.com:8080'},
+                 {'http': 'http://192.168.1.100:3128', 'https': 'http://192.168.1.100:3128'},
+            ],
             "processing_rules": {
                  "text_cleaning": {"quote_text": {"trim": True}}, "transformations": {"tags": "| ', '.join(tag.strip() for tag in value.replace('Tags:', '').split('\\n') if tag.strip()) if isinstance(value, str) else ''"}, "drop_fields": ["tags_raw"]
             },
             "output_dir": "outputs/sample_web",
             "request_delay": 1, "max_retries": 3, "user_agent": "SampleScraper/1.0", "respect_robots": True
         }
-        # --- API Sample (for reference or separate generation command) ---
         api_sample = {
              "name": "Sample API Job - JSONPlaceholder Users",
              "description": "Fetch user data from JSONPlaceholder API",
-             "job_type": "api", # Specify job type
+             "job_type": "api",
              "api_config": {
                  "base_url": "https://jsonplaceholder.typicode.com",
-                 "endpoints": ["/users"], # Single endpoint in this case
+                 "endpoints": ["/users"],
                  "method": "GET",
-                 # "params": {"_limit": 5}, # Example API parameter
-                 # "headers": {"Accept": "application/json"}, # Example header
-                 "data_path": "", # Data is the root list in this API
-                 "field_mappings": { # Rename fields for output
+                 "data_path": "",
+                 "field_mappings": {
                       "user_id": "id",
                       "full_name": "name",
                       "user_name": "username",
                       "email_address": "email",
-                      "city": "address.city" # Example of accessing nested field
+                      "city": "address.city"
                  }
              },
-             "processing_rules": { # Can still process API results
+             "processing_rules": {
                  "text_cleaning": {"full_name": {"trim": True}}
              },
              "output_dir": "outputs/sample_api",
-             "request_delay": 0.5 # Often less delay needed for APIs
+             "request_delay": 0.5
         }
-        # --- End API Sample ---
 
-        # Save the WEB sample config by default
         try:
             with open(output_path, 'w', encoding='utf-8') as f:
                  yaml.dump(sample_config, f, sort_keys=False, default_flow_style=False, allow_unicode=True)
             self.logger.info(f"Sample WEB configuration generated at: {output_path}")
-            # Optionally generate API sample too?
+
             api_output_path = Path(output_path).parent / f"{Path(output_path).stem}_api_example.yaml"
             with open(api_output_path, 'w', encoding='utf-8') as f:
                   yaml.dump(api_sample, f, sort_keys=False, default_flow_style=False, allow_unicode=True)
