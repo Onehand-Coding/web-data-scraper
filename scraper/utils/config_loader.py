@@ -1,4 +1,4 @@
-# File: web-data-scraper/scraper/utils/config_loader.py (Corrected)
+# File: web-data-scraper/scraper/utils/config_loader.py (Corrected Version)
 
 import yaml
 from typing import Dict, Any, List
@@ -87,7 +87,7 @@ WEB_PAGINATION_SCHEMA = {
         "next_page_selector": {"type": "string"},
         "max_pages": {"type": "integer", "minimum": 1}
     },
-    # "required": ["next_page_selector"], # Making this optional as pagination might not always be needed/present
+    # "required": ["next_page_selector"], # Making this optional
     "additionalProperties": False
 }
 
@@ -106,11 +106,43 @@ PROXY_ITEM_SCHEMA = {
     "description": "Proxy server details for HTTP and/or HTTPS protocols."
 }
 
+# --- Login Config Schema ---
+LOGIN_CONFIG_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "login_url": {"type": "string", "format": "uri", "description": "URL of the login page."},
+        "username_selector": {"type": "string", "description": "CSS selector for the username input field."},
+        "password_selector": {"type": "string", "description": "CSS selector for the password input field."},
+        "submit_selector": {"type": "string", "description": "CSS selector for the login submit button."},
+        "username": {"type": "string", "description": "The username credential. WARNING: Storing credentials in config is insecure."},
+        "password": {"type": "string", "description": "The password credential. WARNING: Storing credentials in config is insecure."},
+        "success_selector": {"type": "string", "description": "(Optional) CSS selector for an element that appears only after successful login."},
+        "success_url_contains": {"type": "string", "description": "(Optional) A substring that the URL must contain after successful login."},
+        "wait_after_login": {"type": "number", "minimum": 0, "default": 3, "description": "Seconds to wait after submitting login before checking success."}
+    },
+    "required": [
+        "login_url",
+        "username_selector",
+        "password_selector",
+        "submit_selector",
+        "username",
+        "password"
+    ],
+    "anyOf": [
+        {"required": ["success_selector"]},
+        {"required": ["success_url_contains"]}
+    ],
+    "additionalProperties": False,
+    "description": "Configuration for handling website logins (primarily for DynamicScraper)."
+}
+
+
 # --- Now Define the Class ---
 
 class ConfigLoader:
     """Handles loading and validation of scraping configurations."""
 
+    # --- Main Schema Uses Schemas Defined Above ---
     CONFIG_SCHEMA = {
         "type": "object",
         "properties": {
@@ -122,29 +154,25 @@ class ConfigLoader:
                 "default": "web",
                 "description": "Type of job: 'web' (HTML/Dynamic) or 'api'"
             },
-
-            # --- Web Scraping Specific ---
+            # Web Specific
             "urls": {
                 "type": "array",
                 "items": {"type": "string", "format": "uri"},
                 "description": "List of starting URLs (for job_type: web)"
             },
             "dynamic": {"type": "boolean", "default": False, "description": "Use Selenium for JS rendering (for job_type: web)"},
-            "selectors": WEB_SELECTORS_SCHEMA,
-            "pagination": WEB_PAGINATION_SCHEMA,
-            "wait_for_selector": {"type": "string", "description": "Wait for this CSS selector (for dynamic web)"},
+            "selectors": WEB_SELECTORS_SCHEMA, # Uses schema defined above
+            "pagination": WEB_PAGINATION_SCHEMA, # Uses schema defined above
+            "wait_for_selector": {"type": "string", "description": "Wait for this CSS selector on target pages (for dynamic web)"},
             "headless": {"type": "boolean", "default": True, "description": "Run headless browser (for dynamic web)"},
             "disable_images": {"type": "boolean", "default": True, "description": "Disable images (for dynamic web)"},
             "page_load_timeout": {"type": "integer", "minimum": 5, "default": 30, "description": "Page load timeout in seconds"},
             "wait_time": {"type": "number", "minimum": 0, "default": 5, "description": "General wait time after load (for dynamic web)"},
-
-
-            # --- API Specific ---
-            "api_config": API_CONFIG_SCHEMA,
-
-            # --- Common / General ---
+            # API Specific
+            "api_config": API_CONFIG_SCHEMA, # Uses schema defined above
+            # Common / General
             "processing_rules": {
-                "type": "object",
+                 "type": "object",
                  "properties": {
                      "field_types": {"type": "object", "additionalProperties": {"type": "object", "properties": {"type": {"type": "string", "enum": ["int", "float", "string", "boolean", "datetime", "date"]}, "format": {"type": "string"}}, "required": ["type"], "additionalProperties": False}},
                      "text_cleaning": {"type": "object", "additionalProperties": {"type": "object", "properties": {"trim": {"type": "boolean", "default": True}, "lowercase": {"type": "boolean", "default": False}, "uppercase": {"type": "boolean", "default": False}, "remove_newlines": {"type": "boolean", "default": True}, "remove_extra_spaces": {"type": "boolean", "default": True}, "remove_special_chars": {"type": "boolean", "default": False}, "regex_replace": {"type": "object", "additionalProperties": {"type": "string"}}}, "additionalProperties": False}},
@@ -161,28 +189,26 @@ class ConfigLoader:
             "respect_robots": {"type": "boolean", "default": True},
             "proxies": {
                 "type": "array",
-                "items": PROXY_ITEM_SCHEMA,
-                "description": "List of proxies to use for requests. Each item must be an object with 'http' and/or 'https' keys.",
+                "items": PROXY_ITEM_SCHEMA, # Uses schema defined above
+                "description": "List of proxies to use for requests.",
                 "default": []
-            }
+            },
+            "login_config": LOGIN_CONFIG_SCHEMA # Uses schema defined above
         },
+        # Conditional requirements
         "allOf": [
             {
-                "if": {
-                    "properties": {"job_type": {"const": "web"}}
-                },
-                "then": {
-                    "required": ["urls", "selectors"]
-                }
+                "if": {"properties": {"job_type": {"const": "web"}}},
+                "then": {"required": ["urls", "selectors"]}
             },
             {
-                 "if": {
-                     "properties": {"job_type": {"const": "api"}}
-                 },
-                 "then": {
-                     "required": ["api_config"]
-                 }
-             }
+                 "if": {"properties": {"job_type": {"const": "api"}}},
+                 "then": {"required": ["api_config"]}
+             },
+            # { # Login config usually implies dynamic, but not strictly enforcing
+            #      "if": {"properties": {"login_config": {"type": "object"}}},
+            #      "then": {"properties": {"dynamic": {"const": True}}}
+            #  }
         ],
         "required": ["name"]
     }
@@ -195,7 +221,8 @@ class ConfigLoader:
         try:
             config = self._load_yaml(config_path)
             config.setdefault('job_type', 'web')
-            config.setdefault('proxies', []) # Ensure proxies key exists
+            config.setdefault('proxies', [])
+            # login_config is optional, no need to set default unless validating against it specifically
             self.validate_config(config)
             self.logger.info(f"Configuration loaded and validated: {config_path}")
             return config
@@ -204,6 +231,9 @@ class ConfigLoader:
         except ValidationError as e:
             error_path = " -> ".join(map(str, e.path)) or "root"; msg = f"Config validation error in {config_path} at '{error_path}': {e.message}"
             self.logger.error(msg); self.logger.debug(f"Schema context: {e.schema}"); raise
+        except Exception as e: # Catch other potential errors during loading
+            self.logger.error(f"Unexpected error loading config {config_path}: {e}", exc_info=True); raise
+
 
     def _load_yaml(self, file_path: str) -> Dict[str, Any]:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -211,34 +241,46 @@ class ConfigLoader:
 
     def validate_config(self, config: Dict[str, Any]) -> bool:
         validate(instance=config, schema=self.CONFIG_SCHEMA)
+        if 'login_config' in config and not config.get('dynamic', False):
+             self.logger.warning("login_config is present but 'dynamic' is not true. Login step will be ignored.")
         return True
 
     def generate_sample_config(self, output_path: str) -> None:
+        # Add example login_config (commented out) to the dynamic sample
         sample_config = {
-            "name": "Sample Web Scraper Job",
-            "description": "Example config for scraping a multi-page website with proxy support",
+            "name": "Sample Dynamic Job with Login",
+            "description": "Example config for scraping a dynamic site requiring login",
             "job_type": "web",
-            "urls": ["https://quotes.toscrape.com/"],
-            "dynamic": False,
+            "urls": ["https://example-authenticated-site.com/data"], # Target page AFTER login
+            "dynamic": True, # Requires Selenium
+            "wait_for_selector": "div.data-item", # Wait for element on target page
+            "headless": True,
+            # "login_config": {
+            #     "login_url": "https://example-authenticated-site.com/login",
+            #     "username_selector": "#username",
+            #     "password_selector": "#password",
+            #     "submit_selector": "button[type='submit']",
+            #     "username": "YOUR_USERNAME", # WARNING: INSECURE
+            #     "password": "YOUR_PASSWORD", # WARNING: INSECURE
+            #     "success_selector": "a#logout-button",
+            #     # "success_url_contains": "/dashboard",
+            #     "wait_after_login": 5
+            # },
             "selectors": {
                 "type": "css",
-                "item": "div.quote",
+                "item": "div.data-item",
                 "fields": {
-                    "quote_text": "span.text", "author": "small.author", "tags_raw": "div.tags"
+                    "title": "h2.item-title",
+                    "value": "span.item-value"
                 }
             },
-            "pagination": {
-                "next_page_selector": "li.next a", "max_pages": 3
-            },
-            "proxies": [
-                 {'http': 'http://user1:pass1@proxy.example.com:8080', 'https': 'http://user1:pass1@proxy.example.com:8080'},
-                 {'http': 'http://192.168.1.100:3128', 'https': 'http://192.168.1.100:3128'},
-            ],
+            "pagination": { "max_pages": 1 },
+            "proxies": [],
             "processing_rules": {
-                 "text_cleaning": {"quote_text": {"trim": True}}, "transformations": {"tags": "| ', '.join(tag.strip() for tag in value.replace('Tags:', '').split('\\n') if tag.strip()) if isinstance(value, str) else ''"}, "drop_fields": ["tags_raw"]
+                "text_cleaning": {"title": {"trim": True}}
             },
-            "output_dir": "outputs/sample_web",
-            "request_delay": 1, "max_retries": 3, "user_agent": "SampleScraper/1.0", "respect_robots": True
+            "output_dir": "outputs/sample_dynamic_login",
+            "request_delay": 1, "max_retries": 2, "user_agent": "SampleScraper/1.0", "respect_robots": True
         }
         api_sample = {
              "name": "Sample API Job - JSONPlaceholder Users",
@@ -267,9 +309,11 @@ class ConfigLoader:
         try:
             with open(output_path, 'w', encoding='utf-8') as f:
                  yaml.dump(sample_config, f, sort_keys=False, default_flow_style=False, allow_unicode=True)
-            self.logger.info(f"Sample WEB configuration generated at: {output_path}")
+            self.logger.info(f"Sample DYNAMIC configuration generated at: {output_path}")
 
             api_output_path = Path(output_path).parent / f"{Path(output_path).stem}_api_example.yaml"
+            if api_output_path == Path(output_path):
+                 api_output_path = Path(output_path).parent / f"{Path(output_path).stem}_api.yaml"
             with open(api_output_path, 'w', encoding='utf-8') as f:
                   yaml.dump(api_sample, f, sort_keys=False, default_flow_style=False, allow_unicode=True)
             self.logger.info(f"Sample API configuration generated at: {api_output_path}")
