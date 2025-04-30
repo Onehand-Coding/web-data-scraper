@@ -4,7 +4,8 @@ import time
 import requests
 from typing import Dict, List, Optional, Any
 from .base_scraper import BaseScraper
-# import json # Not needed here
+import json
+import logging
 
 # --- Helper function for nested access ---
 def get_nested_value(data_dict: Dict, key_path: str, default: Any = None) -> Any:
