@@ -24,7 +24,7 @@ A flexible and configurable framework designed for efficient and automated web d
 
 ## Project Structure
 
-web-data-scraper/
+```web-data-scraper/
 ├── configs/               # Default location for YAML configuration files
 │   ├── scraping_jobs/     # Subdir for web UI generated/managed configs
 │   ├── api_test_jsonplaceholder.yaml # Example API config
@@ -52,7 +52,7 @@ web-data-scraper/
 ├── .gitignore
 ├── README.md              # This file
 └── requirements.txt       # Python dependencies
-
+```
 
 ## Setup
 
