@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Configure Scraper</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Keep existing styles */
+        .selector-field, .api-field, .rule-row { margin-bottom: 15px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9; }
+        #api-scrape-options { display: none; } /* Initially hide API options */
+        .remove-rule-btn, .remove-field-btn { margin-top: 32px; /* Align remove button */ }
+        .rule-section { border: 1px solid #eee; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
+        .rule-section h6 { margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px;}
+        .form-check-inline { margin-right: 1rem; } /* Spacing for checkboxes */
+        .validation-options label { font-size: 0.9em; } /* Smaller labels for validation options */
+        .expr-textarea { font-family: monospace; font-size: 0.9em; } /* Textarea for expressions */
+        .expr-help { font-size: 0.85em; color: #6c757d; }
+        .alert-warning code { background-color: #fff3cd; color: #664d03;}
+        #login-config-options { display: none; padding-left: 20px; margin-bottom: 15px; border-left: 3px solid #0d6efd; margin-left: 5px;}
+        #api-scrape-options { padding-left: 20px; margin-bottom: 15px; border-left: 3px solid #198754; margin-left: 5px;} /* Style for API section */
+        #api-scrape-options h5 { margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+       <div class="container"> <a class="navbar-brand" href="/">Web Scraper</a> <div class="collapse navbar-collapse"> <ul class="navbar-nav me-auto mb-2 mb-lg-0"> <li class="nav-item"><a class="nav-link" href="/">Saved Jobs</a></li> <li class="nav-item"><a class="nav-link active" aria-current="page" href="/configure">Configure Job</a></li> </ul> </div> </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="mb-4">{% if form_data and form_data.job_name %}Edit{% else %}Create New{% endif %} Scraping Job</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %} {% if messages %} {% for category, message in messages %} <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert"> {{ message }} <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button> </div> {% endfor %} {% endif %} {% endwith %}
+
+        <form method="POST" action="{{ url_for('configure_scraper') }}" novalidate>
+            {# --- Basic Info, Job Type --- #}
+            <div class="mb-3"> <label for="job_name" class="form-label">Job Name</label> <input type="text" class="form-control" id="job_name" name="job_name" required value="{{ form_data.job_name if form_data else '' }}"></div>
+            <div class="mb-3"> <label for="description" class="form-label">Description (Optional)</label> <input type="text" class="form-control" id="description" name="description" value="{{ form_data.description if form_data else '' }}"></div>
+            <hr>
+            <div class="mb-3"> <h5>Job Type</h5> <div class="form-check form-check-inline"> <input class="form-check-input" type="radio" name="job_type" id="job_type_web" value="web" {% if not form_data.job_type or form_data.job_type == 'web' %}checked{% endif %} onchange="toggleOptions()"> <label class="form-check-label" for="job_type_web">Web Scrape</label> </div> <div class="form-check form-check-inline"> <input class="form-check-input" type="radio" name="job_type" id="job_type_api" value="api" {% if form_data.job_type == 'api' %}checked{% endif %} onchange="toggleOptions()"> <label class="form-check-label" for="job_type_api">API Request</label> </div> </div>
+            <hr>
+
+            {# --- Web Scrape Options --- #}
+            <div id="web-scrape-options" style="display: {% if not form_data.job_type or form_data.job_type == 'web' %}block{% else %}none{% endif %};">
+                 <h5>Web Scraping Details</h5>
+                 <div class="mb-3"><label for="urls" class="form-label">Target URLs (one per line)</label><textarea class="form-control" id="urls" name="urls" rows="3" placeholder="Enter the URL(s) of the page(s) you want to scrape AFTER login (if applicable)">{{ form_data.urls if form_data and form_data.job_type == 'web' else '' }}</textarea></div>
+                 <div class="mb-3 form-check"><input type="checkbox" class="form-check-input" id="dynamic" name="dynamic" {% if form_data and form_data.dynamic %}checked{% endif %} onchange="toggleDynamicOptions(this)"><label class="form-check-label" for="dynamic">Dynamic Content (Use Selenium)</label></div>
+                 {# Dynamic/Selenium specific options #}
+                 <div id="dynamic-options" style="padding-left: 20px; margin-bottom: 15px; display: {% if form_data and form_data.dynamic %}block{% else %}none{% endif %}; border-left: 3px solid #6c757d; margin-left: 5px;">
+                     <h6>Dynamic Options</h6>
+                     <div class="mb-3"><label for="wait_for_selector" class="form-label">Wait for Selector (CSS/XPath)</label><input type="text" class="form-control form-control-sm" id="wait_for_selector" name="wait_for_selector" placeholder="e.g., #content-loaded or //div[@id='data']" value="{{ form_data.wait_for_selector if form_data else '' }}"></div>
+                     <div class="mb-3"><label for="wait_time" class="form-label">General Wait Time (s)</label><input type="number" class="form-control form-control-sm" id="wait_time" name="wait_time" min="0" step="0.5" value="{{ form_data.wait_time if form_data else 5 }}"></div>
+                 </div>
+                 {# Login Configuration Options (Show only if dynamic is checked) #}
+                 <div id="login-config-options" style="padding-left: 20px; margin-bottom: 15px; display: {% if form_data and form_data.dynamic %}block{% else %}none{% endif %}; border-left: 3px solid #0d6efd; margin-left: 5px;">
+                    <h6>Login Configuration (Optional)</h6>
+                    <div class="alert alert-warning alert-sm p-2" role="alert"> <i class="fas fa-exclamation-triangle"></i> <strong>Security Warning:</strong> Storing credentials here is insecure. Consider environment variables or other secure methods for production. </div>
+                    <div class="mb-2"><label for="login_url" class="form-label">Login Page URL</label><input type="url" class="form-control form-control-sm" id="login_url" name="login_url" value="{{ form_data.login_url if form_data else '' }}"></div>
+                    <div class="row">
+                        <div class="col-md-6 mb-2"><label for="username_selector" class="form-label">Username Field Selector (CSS)</label><input type="text" class="form-control form-control-sm" id="username_selector" name="username_selector" value="{{ form_data.username_selector if form_data else '' }}"></div>
+                        <div class="col-md-6 mb-2"><label for="username_cred" class="form-label">Username</label><input type="text" class="form-control form-control-sm" id="username_cred" name="username_cred" value="{{ form_data.username_cred if form_data else '' }}"></div>
+                    </div>
+                    <div class="row">
+                         <div class="col-md-6 mb-2"><label for="password_selector" class="form-label">Password Field Selector (CSS)</label><input type="text" class="form-control form-control-sm" id="password_selector" name="password_selector" value="{{ form_data.password_selector if form_data else '' }}"></div>
+                         <div class="col-md-6 mb-2"><label for="password_cred" class="form-label">Password</label><input type="password" class="form-control form-control-sm" id="password_cred" name="password_cred" value="{{ form_data.password_cred if form_data else '' }}"></div>
+                    </div>
+                    <div class="mb-2"><label for="submit_selector" class="form-label">Submit Button Selector (CSS)</label><input type="text" class="form-control form-control-sm" id="submit_selector" name="submit_selector" value="{{ form_data.submit_selector if form_data else '' }}"></div>
+                    <div class="row">
+                        <div class="col-md-6 mb-2"><label for="success_selector" class="form-label">Success Element Selector (CSS)</label><input type="text" class="form-control form-control-sm" id="success_selector" name="success_selector" placeholder="e.g., #logout-button" value="{{ form_data.success_selector if form_data else '' }}"></div>
+                        <div class="col-md-6 mb-2"><label for="success_url_contains" class="form-label">Success URL Contains</label><input type="text" class="form-control form-control-sm" id="success_url_contains" name="success_url_contains" placeholder="e.g., /dashboard" value="{{ form_data.success_url_contains if form_data else '' }}"></div>
+                    </div>
+                     <div class="mb-2"><label for="wait_after_login" class="form-label">Wait After Login (s)</label><input type="number" class="form-control form-control-sm" id="wait_after_login" name="wait_after_login" min="0" step="0.5" value="{{ form_data.wait_after_login if form_data else 3 }}"></div>
+                 </div>
+
+                 <h6>Selectors (for Target Page)</h6>
+                 <div class="mb-3">
+                     <label class="form-label">Selector Type</label>
+                     <div class="form-check form-check-inline">
+                         <input class="form-check-input" type="radio" name="selector_type" id="css" value="css" {% if not form_data.selector_type or form_data.selector_type == 'css' %}checked{% endif %}>
+                         <label class="form-check-label" for="css">CSS</label>
+                     </div>
+                     <div class="form-check form-check-inline">
+                         <input class="form-check-input" type="radio" name="selector_type" id="xpath" value="xpath" {% if form_data.selector_type == 'xpath' %}checked{% endif %}>
+                         <label class="form-check-label" for="xpath">XPath</label>
+                     </div>
+                 </div>
+                 <div class="mb-3"><label for="container_selector" class="form-label">Container Selector (Optional)</label><input type="text" class="form-control" id="container_selector" name="container_selector" value="{{ form_data.container_selector if form_data else '' }}"></div>
+                 <div class="mb-3"><label for="item_selector" class="form-label">Item Selector</label><input type="text" class="form-control" id="item_selector" name="item_selector" value="{{ form_data.item_selector if form_data else '' }}"></div>
+                 <div id="fields-container" class="mb-3">
+                     <h6>Fields to Extract</h6>
+                     <div class="selector-field" style="display: none;" id="field-template"> <div class="row align-items-end"><div class="col-md-4"><label class="form-label">Field Name</label><input type="text" class="form-control field-name" name="field_name[]" placeholder="e.g., product_title" oninput="updateRuleFieldOptions()"></div><div class="col-md-5"><label class="form-label">Selector (CSS or XPath)</label><input type="text" class="form-control field-selector" name="field_selector[]" placeholder="e.g., h2 a or //h2/a"></div><div class="col-md-2"><label class="form-label">Attribute (Optional)</label><input type="text" class="form-control field-attr" name="field_attr[]" placeholder="href, src, etc."></div><div class="col-md-1"><button type="button" class="btn btn-danger btn-sm remove-field-btn"><i class="fas fa-times"></i></button></div></div></div>
+                     {# Logic to render existing fields #}
+                     {% set rendered_fields = form_data.fields if form_data and form_data.fields else [{'name': '', 'selector': '', 'attr': ''}] %}
+                     {% for field in rendered_fields %}
+                     <div class="selector-field">
+                         <div class="row align-items-end">
+                             <div class="col-md-4"><label class="form-label">Field Name</label><input type="text" class="form-control field-name" name="field_name[]" required value="{{ field.name }}" oninput="updateRuleFieldOptions()"></div>
+                             <div class="col-md-5"><label class="form-label">Selector (CSS or XPath)</label><input type="text" class="form-control field-selector" name="field_selector[]" required value="{{ field.selector }}"></div>
+                             <div class="col-md-2"><label class="form-label">Attribute (Optional)</label><input type="text" class="form-control field-attr" name="field_attr[]" placeholder="href, src, etc." value="{{ field.attr }}"></div>
+                             <div class="col-md-1"> {% if loop.index > 1 %}<button type="button" class="btn btn-danger btn-sm remove-field-btn"><i class="fas fa-times"></i></button>{% endif %}</div>
+                         </div>
+                     </div>
+                     {% endfor %}
+                 </div>
+                 <button type="button" class="btn btn-secondary btn-sm mb-3" id="add-field-btn"><i class="fas fa-plus"></i> Add Field</button>
+                 <h6>Pagination (Optional)</h6>
+                 <div class="row"><div class="col-md-6 mb-3"><label for="next_page_selector" class="form-label">Next Page Selector (CSS/XPath)</label><input type="text" class="form-control" id="next_page_selector" name="next_page_selector" value="{{ form_data.next_page_selector if form_data else '' }}"></div><div class="col-md-6 mb-3"><label for="max_pages" class="form-label">Max Pages</label><input type="number" class="form-control" id="max_pages" name="max_pages" min="1" value="{{ form_data.max_pages if form_data else '' }}"></div></div>
+            </div> {# End Web Scrape Options #}
+
+            {# --- API Scrape Options --- #}
+            <div id="api-scrape-options" style="display: {% if form_data.job_type == 'api' %}block{% else %}none{% endif %};">
+                 <h5>API Configuration</h5>
+                 <div class="mb-3"><label for="api_base_url" class="form-label">Base URL*</label><input type="url" class="form-control" id="api_base_url" name="api_base_url" placeholder="https://api.example.com/v1" required value="{{ form_data.api_base_url if form_data else '' }}"></div>
+                 <div class="mb-3"><label for="api_endpoints" class="form-label">Endpoints* (one per line)</label><textarea class="form-control" id="api_endpoints" name="api_endpoints" rows="2" required placeholder="/users&#10;/posts?userId=1">{{ form_data.api_endpoints if form_data else '' }}</textarea></div>
+                 <div class="mb-3"><label for="api_method" class="form-label">HTTP Method</label><select class="form-select" id="api_method" name="api_method"><option value="GET" {% if not form_data or form_data.api_method == 'GET' %}selected{% endif %}>GET</option><option value="POST" {% if form_data and form_data.api_method == 'POST' %}selected{% endif %}>POST</option><option value="PUT" {% if form_data and form_data.api_method == 'PUT' %}selected{% endif %}>PUT</option><option value="PATCH" {% if form_data and form_data.api_method == 'PATCH' %}selected{% endif %}>PATCH</option><option value="DELETE" {% if form_data and form_data.api_method == 'DELETE' %}selected{% endif %}>DELETE</option></select></div>
+                 <div class="mb-3"><label for="api_params" class="form-label">URL Parameters (JSON, for GET)</label><textarea class="form-control" id="api_params" name="api_params" rows="3" placeholder='{ "api_key": "KEY", "limit": 100 }'>{{ form_data.api_params if form_data else '' }}</textarea></div>
+                 <div class="mb-3"><label for="api_headers" class="form-label">Request Headers (JSON)</label><textarea class="form-control" id="api_headers" name="api_headers" rows="3" placeholder='{ "Accept": "application/json" }'>{{ form_data.api_headers if form_data else '' }}</textarea></div>
+                 <div class="mb-3"><label for="api_data" class="form-label">Request Body/Data (JSON, for POST/PUT)</label><textarea class="form-control" id="api_data" name="api_data" rows="4" placeholder='{ "name": "New Item" }'>{{ form_data.api_data if form_data else '' }}</textarea></div>
+                 <div class="mb-3"><label for="api_data_path" class="form-label">Data Path (Dot notation, e.g., results.items)</label><input type="text" class="form-control" id="api_data_path" name="api_data_path" placeholder="results.items" value="{{ form_data.api_data_path if form_data else '' }}"></div>
+                 <div class="mb-3"><label for="api_field_mappings" class="form-label">Field Mappings (JSON: {"output_name": "apiName"})</label><textarea class="form-control" id="api_field_mappings" name="api_field_mappings" rows="4" placeholder='{ "user_id": "id", "full_name": "name" }'>{{ form_data.api_field_mappings if form_data else '' }}</textarea></div>
+                 {# Future API Pagination section could go here #}
+            </div> {# End API Scrape Options #}
+
+            <hr>
+            {# --- Shared Options --- #}
+            <h5>Shared Options</h5>
+            <div class="row">
+                <div class="col-md-6 mb-3"><label for="request_delay" class="form-label">Request Delay (s)</label><input type="number" class="form-control" id="request_delay" name="request_delay" min="0" step="0.1" value="{{ form_data.request_delay if form_data else 1 }}"></div>
+                <div class="col-md-6 mb-3"><label for="max_retries" class="form-label">Max Retries</label><input type="number" class="form-control" id="max_retries" name="max_retries" min="0" value="{{ form_data.max_retries if form_data else 3 }}"></div>
+            </div>
+            <div class="mb-3"><label for="user_agent" class="form-label">User Agent</label><input type="text" class="form-control" id="user_agent" name="user_agent" value="{{ form_data.user_agent if form_data else 'Python Scraper Framework / 1.0' }}"></div>
+            <div class="mb-3 form-check"><input type="checkbox" class="form-check-input" id="respect_robots" name="respect_robots" {% if not form_data or form_data.respect_robots %}checked{% endif %}><label class="form-check-label" for="respect_robots">Respect robots.txt (Web Only)</label></div>
+            <hr>
+
+            {# --- Processing Rules UI Section --- #}
+            <h5>Processing Rules (Applied After Extraction)</h5>
+            {# --- 1. Field Type Conversion --- #}
+            <div class="rule-section" id="field-types-section">
+                <h6><i class="fas fa-exchange-alt"></i> Field Type Conversion</h6>
+                <div id="field-types-container">
+                    <div class="rule-row row align-items-center" style="display: none;" id="field-type-template"> <div class="col-md-4"><label class="form-label">Field Name</label><select class="form-select rule-field-name" name="ft_field[]"></select></div> <div class="col-md-3"><label class="form-label">Convert To Type</label><select class="form-select" name="ft_type[]"><option value="string">String</option><option value="int">Integer</option><option value="float">Float</option><option value="boolean">Boolean</option><option value="datetime">Datetime</option><option value="date">Date</option></select></div> <div class="col-md-4"><label class="form-label">Format (Date/Time)</label><input type="text" class="form-control" name="ft_format[]" placeholder="%Y-%m-%d %H:%M:%S"></div> <div class="col-md-1"><button type="button" class="btn btn-sm btn-danger remove-rule-btn"><i class="fas fa-times"></i></button></div></div>
+                    {# --- Render existing field type rules --- #}
+                    {% if form_data and form_data.field_type_rules %}
+                        {% for rule in form_data.field_type_rules %}
+                        <div class="rule-row row align-items-center">
+                             <div class="col-md-4"><label class="form-label">Field Name</label><select class="form-select rule-field-name" name="ft_field[]" data-selected="{{ rule.field }}"></select></div>
+                             <div class="col-md-3"><label class="form-label">Convert To Type</label><select class="form-select" name="ft_type[]"> <option value="string" {% if rule.type == 'string' %}selected{% endif %}>String</option> <option value="int" {% if rule.type == 'int' %}selected{% endif %}>Integer</option> <option value="float" {% if rule.type == 'float' %}selected{% endif %}>Float</option> <option value="boolean" {% if rule.type == 'boolean' %}selected{% endif %}>Boolean</option> <option value="datetime" {% if rule.type == 'datetime' %}selected{% endif %}>Datetime</option> <option value="date" {% if rule.type == 'date' %}selected{% endif %}>Date</option> </select></div>
+                             <div class="col-md-4"><label class="form-label">Format (Date/Time)</label><input type="text" class="form-control" name="ft_format[]" placeholder="%Y-%m-%d %H:%M:%S" value="{{ rule.format if rule.format is defined else '' }}"></div>
+                             <div class="col-md-1"><button type="button" class="btn btn-sm btn-danger remove-rule-btn"><i class="fas fa-times"></i></button></div>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addRule('#field-types-container', '#field-type-template')"><i class="fas fa-plus"></i> Add Type Rule</button>
+            </div>
+            {# --- 2. Text Cleaning --- #}
+            <div class="rule-section" id="text-cleaning-section">
+                <h6><i class="fas fa-broom"></i> Text Cleaning</h6>
+                <div id="text-cleaning-container">
+                    <div class="rule-row row" style="display: none;" id="text-cleaning-template"> <div class="col-md-4 mb-2"> <label class="form-label">Field Name</label> <select class="form-select rule-field-name" name="tc_field_base"></select> </div> <div class="col-md-7 mb-2"> <label class="form-label">Cleaning Options</label> <div> <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="tc_trim_base" value="true"><label class="form-check-label">Trim</label></div> <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="tc_lowercase_base" value="true"><label class="form-check-label">Lowercase</label></div> <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="tc_uppercase_base" value="true"><label class="form-check-label">Uppercase</label></div> <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="tc_newlines_base" value="true"><label class="form-check-label">Remove Newlines</label></div> <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="tc_spaces_base" value="true"><label class="form-check-label">Extra Spaces</label></div> <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="tc_special_base" value="true"><label class="form-check-label">Special Chars</label></div> </div> </div> <div class="col-md-1 d-flex align-items-center"> <button type="button" class="btn btn-sm btn-danger remove-rule-btn"><i class="fas fa-times"></i></button> </div> </div>
+                    {# --- Render existing text cleaning rules --- #}
+                    {% if form_data and form_data.text_cleaning_rules %}
+                        {% for rule in form_data.text_cleaning_rules %}
+                        <div class="rule-row row">
+                            <div class="col-md-4 mb-2"> <label class="form-label">Field Name</label> <select class="form-select rule-field-name" name="tc_field_{{ loop.index0 }}" data-selected="{{ rule.field }}"></select> </div>
+                            <div class="col-md-7 mb-2"> <label class="form-label">Cleaning Options</label> <div> <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="tc_trim_{{ loop.index0 }}" value="true" {% if rule.options.get('trim', True) %}checked{% endif %}><label class="form-check-label">Trim</label></div> <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="tc_lowercase_{{ loop.index0 }}" value="true" {% if rule.options.lowercase %}checked{% endif %}><label class="form-check-label">Lowercase</label></div> <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="tc_uppercase_{{ loop.index0 }}" value="true" {% if rule.options.uppercase %}checked{% endif %}><label class="form-check-label">Uppercase</label></div> <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="tc_newlines_{{ loop.index0 }}" value="true" {% if rule.options.get('remove_newlines', True) %}checked{% endif %}><label class="form-check-label">Remove Newlines</label></div> <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="tc_spaces_{{ loop.index0 }}" value="true" {% if rule.options.get('remove_extra_spaces', True) %}checked{% endif %}><label class="form-check-label">Extra Spaces</label></div> <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="tc_special_{{ loop.index0 }}" value="true" {% if rule.options.remove_special_chars %}checked{% endif %}><label class="form-check-label">Special Chars</label></div> </div> </div>
+                            <div class="col-md-1 d-flex align-items-center"> <button type="button" class="btn btn-sm btn-danger remove-rule-btn"><i class="fas fa-times"></i></button> </div>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addIndexedRule('#text-cleaning-container', '#text-cleaning-template', 'tc')"><i class="fas fa-plus"></i> Add Text Cleaning Rule</button>
+            </div>
+             {# --- 3. Validation Rules --- #}
+            <div class="rule-section" id="validation-rules-section">
+                 <h6><i class="fas fa-check"></i> Validation Rules</h6>
+                 <div id="validation-rules-container">
+                     <div class="rule-row row align-items-center" style="display: none;" id="validation-rule-template"> <div class="col-md-3 mb-2"> <label class="form-label">Field Name</label> <select class="form-select rule-field-name" name="val_field_base"></select> </div> <div class="col-md-8 mb-2 validation-options"> <label class="form-label d-block">Validation Options</label> <div class="form-check form-check-inline"> <input class="form-check-input" type="checkbox" name="val_required_base" value="true"> <label class="form-check-label">Required</label> </div> <div class="form-check form-check-inline"> <label class="form-check-label">Min Len:</label> <input type="number" class="form-control form-control-sm d-inline-block" style="width: 70px;" name="val_min_length_base" min="0"> </div> <div class="form-check form-check-inline"> <label class="form-check-label">Max Len:</label> <input type="number" class="form-control form-control-sm d-inline-block" style="width: 70px;" name="val_max_length_base" min="0"> </div> <div class="form-check form-check-inline"> <label class="form-check-label">Pattern (Regex):</label> <input type="text" class="form-control form-control-sm d-inline-block" style="width: 150px;" name="val_pattern_base" placeholder="e.g., ^https?://"> </div> </div> <div class="col-md-1 d-flex align-items-center"> <button type="button" class="btn btn-sm btn-danger remove-rule-btn"><i class="fas fa-times"></i></button> </div> </div>
+                     {# --- Render existing validation rules --- #}
+                     {% if form_data and form_data.validation_rules %}
+                        {% for rule in form_data.validation_rules %}
+                        <div class="rule-row row align-items-center">
+                            <div class="col-md-3 mb-2"> <label class="form-label">Field Name</label> <select class="form-select rule-field-name" name="val_field_{{ loop.index0 }}" data-selected="{{ rule.field }}"></select> </div>
+                            <div class="col-md-8 mb-2 validation-options"> <label class="form-label d-block">Validation Options</label> <div class="form-check form-check-inline"> <input class="form-check-input" type="checkbox" name="val_required_{{ loop.index0 }}" value="true" {% if rule.options.required %}checked{% endif %}> <label class="form-check-label">Required</label> </div> <div class="form-check form-check-inline"> <label class="form-check-label">Min Len:</label> <input type="number" class="form-control form-control-sm d-inline-block" style="width: 70px;" name="val_min_length_{{ loop.index0 }}" min="0" value="{{ rule.options.min_length if rule.options.min_length is defined else '' }}"> </div> <div class="form-check form-check-inline"> <label class="form-check-label">Max Len:</label> <input type="number" class="form-control form-control-sm d-inline-block" style="width: 70px;" name="val_max_length_{{ loop.index0 }}" min="0" value="{{ rule.options.max_length if rule.options.max_length is defined else '' }}"> </div> <div class="form-check form-check-inline"> <label class="form-check-label">Pattern (Regex):</label> <input type="text" class="form-control form-control-sm d-inline-block" style="width: 150px;" name="val_pattern_{{ loop.index0 }}" placeholder="e.g., ^https?://" value="{{ rule.options.pattern if rule.options.pattern else '' }}"> </div> </div>
+                            <div class="col-md-1 d-flex align-items-center"> <button type="button" class="btn btn-sm btn-danger remove-rule-btn"><i class="fas fa-times"></i></button> </div>
+                        </div>
+                        {% endfor %}
+                     {% endif %}
+                 </div>
+                 <button type="button" class="btn btn-secondary btn-sm" onclick="addIndexedRule('#validation-rules-container', '#validation-rule-template', 'val')"><i class="fas fa-plus"></i> Add Validation Rule</button>
+            </div>
+            {# --- 4. Transformation Rules --- #}
+            <div class="rule-section" id="transformation-rules-section">
+                 <h6><i class="fas fa-magic"></i> Transformation Rules (Advanced)</h6>
+                 <div class="alert alert-warning alert-dismissible fade show" role="alert"> <i class="fas fa-exclamation-triangle"></i> <strong>Warning:</strong> Transformations use Python's <code>eval()</code> function. Ensure expressions are safe. <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button> </div>
+                 <div id="transformation-rules-container">
+                     <div class="rule-row row" style="display: none;" id="transformation-rule-template"> <div class="col-md-4 mb-2"> <label class="form-label">Target Field Name</label> <input type="text" class="form-control" name="tr_target_field_base" placeholder="new_field_name or existing_field"> </div> <div class="col-md-7 mb-2"> <label class="form-label">Python Expression</label> <textarea class="form-control expr-textarea" name="tr_expression_base" rows="3" placeholder="e.g., item.get('price', 0) * 1.1"></textarea> <div class="expr-help">Use <code>item['field']</code> for other fields, <code>value</code> for current field (if overwriting).</div> </div> <div class="col-md-1 d-flex align-items-center"> <button type="button" class="btn btn-sm btn-danger remove-rule-btn"><i class="fas fa-times"></i></button> </div> </div>
+                     {# --- Render existing transformation rules --- #}
+                     {% if form_data and form_data.transformation_rules %}
+                        {% for rule in form_data.transformation_rules %}
+                        <div class="rule-row row">
+                            <div class="col-md-4 mb-2"> <label class="form-label">Target Field Name</label> <input type="text" class="form-control" name="tr_target_field_{{ loop.index0 }}" placeholder="new_field_name or existing_field" value="{{ rule.target_field }}"> </div>
+                            <div class="col-md-7 mb-2"> <label class="form-label">Python Expression</label> <textarea class="form-control expr-textarea" name="tr_expression_{{ loop.index0 }}" rows="3" placeholder="e.g., item.get('price', 0) * 1.1">{{ rule.expression }}</textarea> <div class="expr-help">Use <code>item['field']</code> for other fields, <code>value</code> for current field (if overwriting).</div> </div>
+                            <div class="col-md-1 d-flex align-items-center"> <button type="button" class="btn btn-sm btn-danger remove-rule-btn"><i class="fas fa-times"></i></button> </div>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                 </div>
+                 <button type="button" class="btn btn-secondary btn-sm" onclick="addIndexedRule('#transformation-rules-container', '#transformation-rule-template', 'tr')"><i class="fas fa-plus"></i> Add Transformation Rule</button>
+            </div>
+            {# --- 5. Drop Fields --- #}
+            <div class="rule-section" id="drop-fields-section">
+                 <h6><i class="fas fa-trash-alt"></i> Fields To Drop</h6>
+                 <div id="drop-fields-container">
+                    <div class="rule-row row align-items-center" style="display: none;" id="drop-field-template"><div class="col-md-4"><label class="form-label">Field Name to Drop</label><select class="form-select rule-field-name" name="df_field[]"></select></div><div class="col-md-1"><button type="button" class="btn btn-sm btn-danger remove-rule-btn"><i class="fas fa-times"></i></button></div></div>
+                    {# --- Render existing drop field rules --- #}
+                    {% if form_data and form_data.drop_field_rules %}
+                        {% for rule in form_data.drop_field_rules %}
+                        <div class="rule-row row align-items-center">
+                            <div class="col-md-4"><label class="form-label">Field Name to Drop</label><select class="form-select rule-field-name" name="df_field[]" data-selected="{{ rule.field }}"></select></div>
+                            <div class="col-md-1"><button type="button" class="btn btn-sm btn-danger remove-rule-btn"><i class="fas fa-times"></i></button></div>
+                        </div>
+                        {% endfor %}
+                     {% endif %}
+                 </div>
+                 <button type="button" class="btn btn-secondary btn-sm" onclick="addRule('#drop-fields-container', '#drop-field-template')"><i class="fas fa-plus"></i> Add Field to Drop</button>
+            </div>
+
+            <hr>
+
+            {# --- Submit Button --- #}
+            <button type="submit" class="btn btn-primary btn-lg mt-3"><i class="fas fa-save"></i> {% if form_data and form_data.job_name %}Save Changes{% else %}Save New Configuration{% endif %}</button>
+            <a href="/" class="btn btn-secondary btn-lg mt-3">Cancel</a>
+        </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    {# --- JavaScript (Keep ALL existing JS) --- #}
+    <script>
+        function toggleOptions(){const j=document.querySelector('input[name="job_type"]:checked').value,w=document.getElementById('web-scrape-options'),a=document.getElementById('api-scrape-options');if(w&&a){if(j==='api'){w.style.display='none';a.style.display='block';}else{w.style.display='block';a.style.display='none';toggleDynamicOptions(document.getElementById('dynamic'));}}updateRuleFieldOptions();} // Added updateRuleFieldOptions here
+        function toggleDynamicOptions(c){const d=document.getElementById('dynamic-options'), l=document.getElementById('login-config-options');if(c&&d&&l){d.style.display=c.checked?'block':'none';l.style.display=c.checked?'block':'none';}}
+        const dc=document.getElementById('dynamic');if(dc){dc.addEventListener('change',function(){toggleDynamicOptions(this);});}
+        const fieldsContainer=document.getElementById('fields-container');const addFieldBtn=document.getElementById('add-field-btn');const fieldTmpl=document.getElementById('field-template');function addFieldRmListen(b){b.addEventListener('click',function(){this.closest('.selector-field').remove();updateRuleFieldOptions();});} if(addFieldBtn&&fieldsContainer&&fieldTmpl){addFieldBtn.addEventListener('click',function(){const n=fieldTmpl.cloneNode(true);n.style.display='block';n.removeAttribute('id');n.querySelectorAll('input').forEach(i=>i.value='');const r=n.querySelector('.remove-field-btn');if(r){addFieldRmListen(r);} fieldsContainer.appendChild(n);updateRuleFieldOptions();});fieldsContainer.querySelectorAll('.remove-field-btn').forEach(b=>{addFieldRmListen(b);});}
+        let ruleIndex = 0; function addRuleRemoveListener(b){b.addEventListener('click',function(){this.closest('.rule-row').remove();});} function addRule(containerSelector, templateSelector){const c=document.querySelector(containerSelector),t=document.querySelector(templateSelector);if(c&&t){const n=t.cloneNode(true);n.style.display='flex';n.removeAttribute('id');const r=n.querySelector('.remove-rule-btn');if(r){addRuleRemoveListener(r);} c.appendChild(n);populateFieldOptions(n.querySelector('.rule-field-name'));}else{console.error("Rule container/template not found:", containerSelector, templateSelector);}}
+        function addIndexedRule(containerSelector,templateSelector,namePrefix){const c=document.querySelector(containerSelector),t=document.querySelector(templateSelector);if(c&&t){const n=t.cloneNode(true);n.style.display='flex';n.removeAttribute('id');const idx=ruleIndex++;n.querySelectorAll('input, select, textarea').forEach(el=>{const o=el.getAttribute('name');if(o){const b=o.replace('_base','');el.name=`${b}_${idx}`;}});const r=n.querySelector('.remove-rule-btn');if(r){addRuleRemoveListener(r);} c.appendChild(n);populateFieldOptions(n.querySelector('.rule-field-name'));}else{console.error("Indexed Rule container/template not found:", containerSelector, templateSelector);}} document.querySelectorAll('.remove-rule-btn').forEach(b=>{addRuleRemoveListener(b);});
+        function getDefinedFieldNames(){const n=new Set(); const jobType = document.querySelector('input[name="job_type"]:checked').value; if(jobType==='web'){document.querySelectorAll('#fields-container .field-name').forEach(i=>{if(i.value.trim()){n.add(i.value.trim());}});}else if(jobType==='api'){try{const mappings=JSON.parse(document.getElementById('api_field_mappings').value || '{}'); Object.keys(mappings).forEach(k => n.add(k));}catch(e){console.warn("Could not parse API field mappings for rule options.");}} return Array.from(n);}
+        function populateFieldOptions(s,v=null){if(!s)return;const c=v||s.dataset.selected||s.value;s.innerHTML='<option value="">-- Select Field --</option>';const f=getDefinedFieldNames();f.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;if(n===c){o.selected=true;}s.appendChild(o);});if(s.dataset.selected){delete s.dataset.selected;}} function updateRuleFieldOptions(){document.querySelectorAll('.rule-field-name').forEach(s=>{populateFieldOptions(s);});}
+        document.addEventListener('DOMContentLoaded', () => {
+            let maxIndex = -1;
+            document.querySelectorAll('[name^="tc_field_"], [name^="val_field_"], [name^="tr_target_field_"]').forEach(el => {
+                const match = el.name.match(/_(\d+)$/);
+                if (match && parseInt(match[1]) > maxIndex) { maxIndex = parseInt(match[1]); }
+            });
+            ruleIndex = maxIndex + 1;
+            toggleOptions(); updateRuleFieldOptions();
+            // Ensure API field mappings also trigger updates
+            const apiMappingsInput = document.getElementById('api_field_mappings');
+            if (apiMappingsInput) { apiMappingsInput.addEventListener('input', updateRuleFieldOptions); }
+        });
+    </script>
+</body>
+</html>
