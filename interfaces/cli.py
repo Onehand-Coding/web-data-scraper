@@ -1,4 +1,4 @@
-# File: web-data-scraper/interfaces/cli.py
+# File: web-data-scraper/interfaces/cli.py (Updated)
 
 import typer
 from typing import Optional, Dict
@@ -6,6 +6,7 @@ import yaml
 from pathlib import Path
 from jsonschema import ValidationError
 import logging # Import logging
+import time # Import time
 
 # --- Import APIScraper ---
 from scraper.api_scraper import APIScraper
@@ -36,8 +37,8 @@ def run_scraper(
     try:
         config = config_loader.load_config(str(config_file))
         # Store CLI options in config if they need to override file values
-        # (currently output_format isn't in config, headless is)
-        config['headless'] = headless # For dynamic scraper
+        if config.get('dynamic'): # Only override headless if it's a dynamic job
+            config['headless'] = headless
 
         job_type = config.get('job_type', 'web') # Default to web if not specified
         typer.echo(f"Running job: {config.get('name', 'Unnamed Job')} (Type: {job_type.upper()})")
@@ -51,7 +52,7 @@ def run_scraper(
              scraper_instance = APIScraper(config)
         elif job_type == 'web':
             if config.get('dynamic', False):
-                typer.echo("Using Dynamic Web Scraper (Selenium)")
+                typer.echo(f"Using Dynamic Web Scraper (Selenium, Headless: {config['headless']})")
                 scraper_instance = DynamicScraper(config)
             else:
                 typer.echo("Using HTML Web Scraper (BeautifulSoup)")
@@ -69,7 +70,9 @@ def run_scraper(
         storage = None
         output_format_lower = output_format.lower()
         output_base_dir = Path(config.get('output_dir', 'outputs'))
-        job_output_dir = output_base_dir / Path(config_file).stem
+        # Use secure_filename logic or sanitize job name for directory
+        safe_job_name_for_dir = "".join(c if c.isalnum() else '_' for c in config.get('name', 'job'))
+        job_output_dir = output_base_dir / safe_job_name_for_dir
         job_output_dir.mkdir(parents=True, exist_ok=True)
         storage_config = config.copy()
         storage_config['output_dir'] = str(job_output_dir)
@@ -81,7 +84,8 @@ def run_scraper(
 
         # Save results
         if result.get('data'):
-            output_path = storage.save(result['data'])
+            # Filename generation is now handled within storage handlers
+            output_path = storage.save(result['data']) # Pass None for filename
             typer.echo(f"\nScraping completed successfully!")
             typer.echo(f"Results saved to: {output_path}")
             typer.echo(f"Statistics: {result.get('stats', {})}")
@@ -121,7 +125,8 @@ def generate_config(
 
         # generate_sample_config now creates both files
         config_loader.generate_sample_config(str(web_path))
-        # The messages are now logged within generate_sample_config
+        typer.echo(f"Sample WEB config written to: {web_path}")
+        typer.echo(f"Sample API config written to: {api_path}")
 
     except Exception as e:
         logger.exception(f"Failed to generate config file(s): {e}")

@@ -1,4 +1,4 @@
-# File: web-data-scraper/scraper/utils/config_loader.py (Indentation Corrected)
+# File: web-data-scraper/scraper/utils/config_loader.py (Updated)
 
 import yaml
 from typing import Dict, Any, List
@@ -26,8 +26,8 @@ API_CONFIG_SCHEMA = {
             "default": "GET",
             "description": "HTTP method for the request"
         },
-        "params": {"type": "object", "description": "URL parameters (for GET requests), key-value pairs"},
-        "headers": {"type": "object", "description": "HTTP headers, key-value pairs"},
+        "params": {"type": "object", "description": "URL parameters (for GET requests), key-value pairs", "additionalProperties": True}, # Allow any params
+        "headers": {"type": "object", "description": "HTTP headers, key-value pairs", "additionalProperties": True}, # Allow any headers
         "data": {"type": ["object", "string"], "description": "Request body (for POST/PUT/PATCH), usually JSON object or string"},
         "data_path": {
             "type": "string",
@@ -42,12 +42,13 @@ API_CONFIG_SCHEMA = {
              "type": "object",
              "properties": {
                  "type": {"type": "string", "enum": ["page_param", "next_url", "offset_limit"]},
+                 # Add specific pagination params here if needed later
              },
              "description": "(Future) Define API pagination strategy"
         }
     },
     "required": ["base_url", "endpoints"],
-    "additionalProperties": False
+    "additionalProperties": False # Disallow unknown keys within api_config
 }
 
 # --- Web Selectors Schema ---
@@ -93,7 +94,7 @@ WEB_PAGINATION_SCHEMA = {
         "next_page_selector": {"type": "string"},
         "max_pages": {"type": "integer", "minimum": 1}
     },
-    # "required": ["next_page_selector"], # Optional
+    # "required": ["next_page_selector"], # Making it optional
     "additionalProperties": False
 }
 
@@ -134,6 +135,7 @@ LOGIN_CONFIG_SCHEMA = {
         "username",
         "password"
     ],
+    # Login success requires at least one check method
     "anyOf": [
         {"required": ["success_selector"]},
         {"required": ["success_url_contains"]}
@@ -142,12 +144,79 @@ LOGIN_CONFIG_SCHEMA = {
     "description": "Configuration for handling website logins (primarily for DynamicScraper)."
 }
 
+# --- Processing Rules Sub-Schemas ---
+FIELD_TYPES_SCHEMA = {
+    "type": "object",
+    "additionalProperties": {
+        "type": "object",
+        "properties": {
+            "type": {"type": "string", "enum": ["int", "float", "string", "boolean", "datetime", "date"]},
+            "format": {"type": "string", "description": "Format string (e.g., %Y-%m-%d) for date/datetime conversion."}
+        },
+        "required": ["type"],
+        "additionalProperties": False
+    }
+}
+
+TEXT_CLEANING_SCHEMA = {
+    "type": "object",
+    "additionalProperties": {
+        "type": "object",
+        "properties": {
+            "trim": {"type": "boolean", "default": True},
+            "lowercase": {"type": "boolean", "default": False},
+            "uppercase": {"type": "boolean", "default": False},
+            "remove_newlines": {"type": "boolean", "default": True},
+            "remove_extra_spaces": {"type": "boolean", "default": True},
+            "remove_special_chars": {"type": "boolean", "default": False},
+            "regex_replace": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Dictionary of regex patterns to replace."}
+        },
+        "additionalProperties": False
+    }
+}
+
+TRANSFORMATIONS_SCHEMA = {
+    "type": "object",
+    "additionalProperties": {"type": "string", "description": "Python expression to generate/transform the field value."}
+}
+
+VALIDATIONS_SCHEMA = {
+    "type": "object",
+    "additionalProperties": {
+        "type": "object",
+        "properties": {
+            "required": {"type": "boolean", "default": False},
+            "min_length": {"type": "integer", "minimum": 0},
+            "max_length": {"type": "integer", "minimum": 0},
+            "pattern": {"type": "string", "format": "regex", "description": "Python regex pattern."}
+        },
+        "additionalProperties": False
+    }
+}
+
+DROP_FIELDS_SCHEMA = {
+    "type": "array",
+    "items": {"type": "string"}
+}
+
+PROCESSING_RULES_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "field_types": FIELD_TYPES_SCHEMA,
+        "text_cleaning": TEXT_CLEANING_SCHEMA,
+        "transformations": TRANSFORMATIONS_SCHEMA,
+        "validations": VALIDATIONS_SCHEMA,
+        "drop_fields": DROP_FIELDS_SCHEMA
+    },
+    "additionalProperties": False # No other keys allowed directly under processing_rules
+}
 
 # --- ConfigLoader Class ---
 
 class ConfigLoader:
     """Handles loading and validation of scraping configurations."""
 
+    # --- Main Config Schema ---
     CONFIG_SCHEMA = {
         "type": "object",
         "properties": {
@@ -159,29 +228,46 @@ class ConfigLoader:
                 "default": "web",
                 "description": "Type of job: 'web' (HTML/Dynamic) or 'api'"
             },
-            # Web Specific
-            "urls": { "type": "array", "items": {"type": "string", "format": "uri"}},
-            "dynamic": {"type": "boolean", "default": False},
-            "selectors": WEB_SELECTORS_SCHEMA,
-            "pagination": WEB_PAGINATION_SCHEMA,
-            "wait_for_selector": {"type": "string"}, "headless": {"type": "boolean", "default": True},
-            "disable_images": {"type": "boolean", "default": True}, "page_load_timeout": {"type": "integer", "minimum": 5, "default": 30},
-            "wait_time": {"type": "number", "minimum": 0, "default": 5},
-            # API Specific
-            "api_config": API_CONFIG_SCHEMA,
-            # Common / General
-            "processing_rules": { "type": "object", "properties": { "field_types": {"type": "object", "additionalProperties": {"type": "object", "properties": {"type": {"type": "string", "enum": ["int", "float", "string", "boolean", "datetime", "date"]}, "format": {"type": "string"}}, "required": ["type"], "additionalProperties": False}}, "text_cleaning": {"type": "object", "additionalProperties": {"type": "object", "properties": {"trim": {"type": "boolean", "default": True}, "lowercase": {"type": "boolean", "default": False}, "uppercase": {"type": "boolean", "default": False}, "remove_newlines": {"type": "boolean", "default": True}, "remove_extra_spaces": {"type": "boolean", "default": True}, "remove_special_chars": {"type": "boolean", "default": False}, "regex_replace": {"type": "object", "additionalProperties": {"type": "string"}}}, "additionalProperties": False}}, "transformations": {"type": "object", "additionalProperties": {"type": "string"}}, "validations": {"type": "object", "additionalProperties": {"type": "object", "properties": {"required": {"type": "boolean", "default": False}, "min_length": {"type": "integer", "minimum": 0}, "max_length": {"type": "integer", "minimum": 0}, "pattern": {"type": "string", "format": "regex"}}, "additionalProperties": False}}, "drop_fields": {"type": "array", "items": {"type": "string"}} }, "additionalProperties": False },
-            "output_dir": {"type": "string", "default": "outputs"}, "request_delay": {"type": "number", "minimum": 0, "default": 1},
-            "max_retries": {"type": "integer", "minimum": 0, "default": 3}, "user_agent": {"type": "string"},
-            "respect_robots": {"type": "boolean", "default": True}, "proxies": { "type": "array", "items": PROXY_ITEM_SCHEMA, "default": [] },
-            "login_config": LOGIN_CONFIG_SCHEMA
+
+            # --- Web Specific ---
+            "urls": { "type": "array", "items": {"type": "string", "format": "uri"}, "description": "List of starting URLs (for web jobs)"},
+            "dynamic": {"type": "boolean", "default": False, "description": "Use Selenium if true (for web jobs)"},
+            "selectors": WEB_SELECTORS_SCHEMA, # Schema defined above
+            "pagination": WEB_PAGINATION_SCHEMA, # Schema defined above
+            "wait_for_selector": {"type": "string", "description": "CSS/XPath selector to wait for before extracting (dynamic only)"},
+            "headless": {"type": "boolean", "default": True, "description": "Run browser headless (dynamic only)"},
+            "disable_images": {"type": "boolean", "default": True, "description": "Disable image loading (dynamic only)"},
+            "page_load_timeout": {"type": "integer", "minimum": 5, "default": 30, "description": "Timeout for page loads (dynamic only)"},
+            "wait_time": {"type": "number", "minimum": 0, "default": 5, "description": "General wait time after page load/action (dynamic only)"},
+            "login_config": LOGIN_CONFIG_SCHEMA, # Schema defined above
+
+            # --- API Specific ---
+            "api_config": API_CONFIG_SCHEMA, # Schema defined above
+
+            # --- Common / General ---
+            "processing_rules": PROCESSING_RULES_SCHEMA, # Schema defined above
+            "output_dir": {"type": "string", "default": "outputs", "description": "Base directory for output files"},
+            "request_delay": {"type": "number", "minimum": 0, "default": 1, "description": "Delay in seconds between requests"},
+            "max_retries": {"type": "integer", "minimum": 0, "default": 3, "description": "Max retries on failed requests"},
+            "user_agent": {"type": "string", "description": "Custom User-Agent string"},
+            "respect_robots": {"type": "boolean", "default": True, "description": "Whether to obey robots.txt rules (web only)"},
+            "proxies": { "type": "array", "items": PROXY_ITEM_SCHEMA, "default": [], "description": "List of proxies to use"}
         },
-        # Conditional requirements
+        # --- Conditional requirements ---
         "allOf": [
-            {"if": {"properties": {"job_type": {"const": "web"}}}, "then": {"required": ["urls", "selectors"]}},
-            {"if": {"properties": {"job_type": {"const": "api"}}}, "then": {"required": ["api_config"]}},
-        ], "required": ["name"]
+            {
+                "if": {"properties": {"job_type": {"const": "web"}}},
+                "then": {"required": ["urls", "selectors"]}
+            },
+            {
+                "if": {"properties": {"job_type": {"const": "api"}}},
+                "then": {"required": ["api_config"]}
+            },
+        ],
+        "required": ["name"] # Only 'name' is universally required
     }
+    # --- End Main Config Schema ---
+
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
@@ -207,32 +293,49 @@ class ConfigLoader:
         validate(instance=config, schema=self.CONFIG_SCHEMA)
         if 'login_config' in config and not config.get('dynamic', False):
              self.logger.warning("login_config is present but 'dynamic' is not true. Login will be ignored.")
+        # Add specific checks for selector types if needed (e.g., XPath vs CSS)
         return True
 
     def generate_sample_config(self, output_path: str) -> None:
         # Define sample configs (keep them concise for clarity)
         sample_config_web = {
             "name": "Sample Dynamic Job with Login", "description": "Example config for scraping dynamic site requiring login",
-            "job_type": "web", "urls": ["https://example-authenticated-site.com/data"], "dynamic": True,
-            "wait_for_selector": "div.data-item", "headless": True,
-            # "login_config": { ... Example commented out ... },
-            "selectors": { "type": "css", "item": "div.data-item", "fields": { "title": "h2.item-title", "value": "span.item-value" } },
-            "pagination": { "max_pages": 1 }, "proxies": [], "processing_rules": { "text_cleaning": {"title": {"trim": True}} },
+            "job_type": "web", "urls": ["https://quotes.toscrape.com/"], # Changed URL
+            "dynamic": True,
+            "wait_for_selector": "div.quote", "headless": True, "page_load_timeout": 30, "wait_time": 3,
+            "login_config": {
+                "login_url": "https://quotes.toscrape.com/login", "username_selector": "#username",
+                "password_selector": "#password", "submit_selector": "input[type='submit']",
+                "username": "testuser", "password": "password", "success_selector": "a[href='/logout']",
+                "wait_after_login": 2
+            },
+            "selectors": { "type": "css", "item": "div.quote", "fields": { "quote_text": "span.text", "author": "small.author" } },
+            "pagination": { "next_page_selector": "li.next a", "max_pages": 2 }, "proxies": [],
+            "processing_rules": { "text_cleaning": {"author": {"uppercase": True}}, "validations": {"quote_text": {"required": True}}},
             "output_dir": "outputs/sample_dynamic_login", "request_delay": 1, "max_retries": 2, "user_agent": "SampleScraper/1.0", "respect_robots": True
         }
         api_sample = {
              "name": "Sample API Job - JSONPlaceholder Users", "job_type": "api",
-             "api_config": { "base_url": "https://jsonplaceholder.typicode.com", "endpoints": ["/users"], "method": "GET", "data_path": "", "field_mappings": { "user_id": "id", "full_name": "name", "email": "email", "city": "address.city" } },
-             "processing_rules": { "text_cleaning": {"full_name": {"trim": True}} }, "output_dir": "outputs/sample_api", "request_delay": 0.5
+             "api_config": {
+                 "base_url": "https://jsonplaceholder.typicode.com",
+                 "endpoints": ["/users"],
+                 "method": "GET",
+                 "data_path": "", # Process root list
+                 "field_mappings": { "user_id": "id", "full_name": "name", "email": "email", "city": "address.city" }
+             },
+             "processing_rules": {
+                 "text_cleaning": {"full_name": {"trim": True}},
+                 "validations": {"email": {"required": True, "pattern": r".+@.+\..+"}}
+             },
+             "output_dir": "outputs/sample_api", "request_delay": 0.5
         }
 
-        # --- Corrected Indentation in try...except block ---
         try:
             # Save the DYNAMIC sample config (use output_path provided)
             web_sample_path = Path(output_path)
             with open(web_sample_path, 'w', encoding='utf-8') as f:
                  yaml.dump(sample_config_web, f, sort_keys=False, default_flow_style=False, allow_unicode=True)
-            self.logger.info(f"Sample DYNAMIC configuration generated at: {web_sample_path}")
+            self.logger.info(f"Sample WEB configuration generated at: {web_sample_path}")
 
             # Save API sample too (derive name)
             api_output_path = web_sample_path.parent / f"{web_sample_path.stem}_api_example.yaml"
@@ -243,7 +346,5 @@ class ConfigLoader:
             self.logger.info(f"Sample API configuration generated at: {api_output_path}")
 
         except Exception as e:
-             # This except block now correctly corresponds to the try block above
              self.logger.error(f"Failed to generate sample config files: {e}", exc_info=True)
              raise
-        # --- End Corrected Indentation ---

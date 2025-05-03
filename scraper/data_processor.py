@@ -81,14 +81,16 @@ class DataProcessor:
 
         # 3. Field transformations
         transformed_values = {}
-        # --- ADD isinstance TO SAFE BUILTINS ---
+        # --- ADD isinstance AND len TO SAFE BUILTINS ---
         safe_builtins = {
             "len": len, "str": str, "int": int, "float": float,
             "list": list, "dict": dict, "set": set, "tuple": tuple,
             "abs": abs, "round": round, "max": max, "min": min, "sum": sum,
             "true": True, "false": False, "none": None,
-            "isinstance": isinstance # <-- ADDED HERE
+            "isinstance": isinstance, # <-- ADDED
+            "len": len # <-- ADDED
         }
+        # Also add utility modules if needed, provide item and current value
         context = {'value': None, 'item': item, 're': re, 'datetime': datetime, 'date': date}
 
         for target_field, transform_expression in rules.get('transformations', {}).items():
@@ -105,10 +107,14 @@ class DataProcessor:
 
         # 4. Field validation
         for field, validation_rules in rules.get('validations', {}).items():
-             if field in item:
-                 is_valid = self._validate_field(item[field], validation_rules)
-                 if not is_valid: self.logger.warning(f"Field '{field}' ('{item[field]}') failed validation: {validation_rules}. Setting to None."); item[field] = None;
-             elif validation_rules.get('required'): self.logger.warning(f"Required field '{field}' missing. Setting to None."); item[field] = None;
+             # Check if field exists or if it's required
+             if field in item or validation_rules.get('required'):
+                 # Pass the value or None if required but missing
+                 value_to_validate = item.get(field)
+                 is_valid = self._validate_field(value_to_validate, validation_rules)
+                 if not is_valid:
+                      self.logger.warning(f"Field '{field}' ('{str(value_to_validate)[:50]}...') failed validation: {validation_rules}. Setting to None.")
+                      item[field] = None # Set invalid field to None
 
         return item
 

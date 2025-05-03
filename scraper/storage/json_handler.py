@@ -1,7 +1,6 @@
-"""
-JSON storage implementation.
-"""
-import time
+# File: web-data-scraper/scraper/storage/json_handler.py (Corrected)
+
+import time # <-- Added import
 import json
 from pathlib import Path
 from typing import List, Dict
@@ -14,7 +13,10 @@ class JSONStorage(BaseStorage):
     def save(self, data: List[Dict], filename: str = None) -> str:
         """Save data to JSON file."""
         if not filename:
-            filename = f"scraped_data_{int(time.time())}.json"
+            # Generate filename based on job name if available, else timestamp
+            job_name_part = "".join(c if c.isalnum() else '_' for c in self.config.get('name', 'scraped_data'))
+            timestamp = int(time.time()) # <-- Use imported time
+            filename = f"{job_name_part}_{timestamp}.json"
 
         filepath = self.output_dir / filename
 

@@ -1,4 +1,4 @@
-# File: web-data-scraper/interfaces/web_app/app.py (Corrected SyntaxError Line 244)
+# File: web-data-scraper/interfaces/web_app/app.py (Updated for API)
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, abort
 from pathlib import Path
@@ -56,7 +56,7 @@ def get_config_files_details():
     configs.sort(key=lambda x: x.get('modified_time', 0), reverse=True)
     return configs
 
-# --- Helper to Parse Form Rules (Corrected) ---
+# --- Helper to Parse Form Rules (Remains the Same) ---
 def parse_processing_rules(form):
     """Parses dynamic processing rules from Flask form data."""
     rules = {}
@@ -142,8 +142,25 @@ def edit_config(filename):
     try:
         config_data = config_loader.load_config(str(config_path))
         logger.info(f"Loading config '{safe_filename}' for editing.")
-        form_data = {'job_name': config_data.get('name'), 'description': config_data.get('description'), 'job_type': config_data.get('job_type', 'web'), 'request_delay': config_data.get('request_delay', 1), 'max_retries': config_data.get('max_retries', 3), 'user_agent': config_data.get('user_agent'), 'respect_robots': config_data.get('respect_robots', True)}
+        # Initialize base form data
+        form_data = {
+            'job_name': config_data.get('name'),
+            'description': config_data.get('description'),
+            'job_type': config_data.get('job_type', 'web'),
+            'request_delay': config_data.get('request_delay', 1),
+            'max_retries': config_data.get('max_retries', 3),
+            'user_agent': config_data.get('user_agent'),
+            'respect_robots': config_data.get('respect_robots', True),
+            # Initialize empty rule lists to avoid errors if they don't exist
+            'field_type_rules': [],
+            'text_cleaning_rules': [],
+            'validation_rules': [],
+            'transformation_rules': [],
+            'drop_field_rules': []
+        }
         defined_field_names = []
+
+        # Load Web Specific Fields
         if form_data['job_type'] == 'web':
             form_data['urls'] = "\n".join(config_data.get('urls', [])); form_data['dynamic'] = config_data.get('dynamic', False)
             form_data['wait_for_selector'] = config_data.get('wait_for_selector'); form_data['wait_time'] = config_data.get('wait_time', 5)
@@ -156,15 +173,26 @@ def edit_config(filename):
             pagination = config_data.get('pagination'); form_data['next_page_selector'] = pagination.get('next_page_selector') if pagination else None; form_data['max_pages'] = pagination.get('max_pages') if pagination else None
             login_cfg = config_data.get('login_config');
             if login_cfg: form_data['login_url'] = login_cfg.get('login_url'); form_data['username_selector'] = login_cfg.get('username_selector'); form_data['password_selector'] = login_cfg.get('password_selector'); form_data['submit_selector'] = login_cfg.get('submit_selector'); form_data['username_cred'] = login_cfg.get('username'); form_data['password_cred'] = login_cfg.get('password'); form_data['success_selector'] = login_cfg.get('success_selector'); form_data['success_url_contains'] = login_cfg.get('success_url_contains'); form_data['wait_after_login'] = login_cfg.get('wait_after_login', 3)
+        # Load API Specific Fields
         elif form_data['job_type'] == 'api':
-            api_cfg = config_data.get('api_config', {}); form_data['api_base_url'] = api_cfg.get('base_url'); form_data['api_endpoints'] = "\n".join(api_cfg.get('endpoints', [])); form_data['api_method'] = api_cfg.get('method', 'GET'); form_data['api_params'] = json.dumps(api_cfg.get('params'), indent=2) if api_cfg.get('params') else ''; form_data['api_headers'] = json.dumps(api_cfg.get('headers'), indent=2) if api_cfg.get('headers') else ''; form_data['api_data'] = json.dumps(api_cfg.get('data'), indent=2) if api_cfg.get('data') else ''; form_data['api_data_path'] = api_cfg.get('data_path'); form_data['api_field_mappings'] = json.dumps(api_cfg.get('field_mappings'), indent=2) if api_cfg.get('field_mappings') else ''; defined_field_names = list(api_cfg.get('field_mappings', {}).keys())
+            api_cfg = config_data.get('api_config', {}); form_data['api_base_url'] = api_cfg.get('base_url'); form_data['api_endpoints'] = "\n".join(api_cfg.get('endpoints', [])); form_data['api_method'] = api_cfg.get('method', 'GET');
+            # Handle potential JSON fields safely
+            form_data['api_params'] = json.dumps(api_cfg.get('params'), indent=2) if api_cfg.get('params') else ''
+            form_data['api_headers'] = json.dumps(api_cfg.get('headers'), indent=2) if api_cfg.get('headers') else ''
+            form_data['api_data'] = json.dumps(api_cfg.get('data'), indent=2) if api_cfg.get('data') else ''
+            form_data['api_data_path'] = api_cfg.get('data_path')
+            form_data['api_field_mappings'] = json.dumps(api_cfg.get('field_mappings'), indent=2) if api_cfg.get('field_mappings') else ''
+            defined_field_names = list(api_cfg.get('field_mappings', {}).keys()) # Get fields from API mappings
+
+        # Load Processing Rules (Common to both)
         rules_raw = config_data.get('processing_rules', {})
         form_data['field_type_rules'] = [{'field':f,**t} for f,t in rules_raw.get('field_types',{}).items()]; defined_field_names.extend(rules_raw.get('field_types',{}).keys())
         form_data['text_cleaning_rules'] = [{'field':f,'options':o} for f,o in rules_raw.get('text_cleaning',{}).items()]; defined_field_names.extend(rules_raw.get('text_cleaning',{}).keys())
         form_data['validation_rules'] = [{'field':f,'options':o} for f,o in rules_raw.get('validations',{}).items()]; defined_field_names.extend(rules_raw.get('validations',{}).keys())
         form_data['transformation_rules'] = [{'target_field':f,'expression':e} for f,e in rules_raw.get('transformations',{}).items()]; defined_field_names.extend(rules_raw.get('transformations',{}).keys())
         form_data['drop_field_rules'] = [{'field':f} for f in rules_raw.get('drop_fields',[])]; defined_field_names.extend(rules_raw.get('drop_fields',[]))
-        form_data['defined_field_names'] = sorted(list(set(defined_field_names)))
+        form_data['defined_field_names'] = sorted(list(set(defined_field_names))) # Make unique and sort
+
         return render_template('configure.html', form_data=form_data)
     except (JsonSchemaValidationError, yaml.YAMLError) as e: error_msg = f"Config Error: {getattr(e, 'message', str(e))}"; logger.error(f"Config load error for {safe_filename}: {error_msg}"); flash(f"Cannot edit '{safe_filename}': {error_msg}", 'error'); return redirect(url_for('index'))
     except Exception as e: logger.error(f"Error loading {safe_filename} for editing: {e}", exc_info=True); flash(f"Could not load '{safe_filename}'.", "error"); return redirect(url_for('index'))
@@ -172,14 +200,26 @@ def edit_config(filename):
 @app.route('/configure', methods=['GET', 'POST'])
 def configure_scraper():
     if request.method == 'POST':
-        form_data_for_template = request.form.to_dict()
+        form_data_for_template = request.form.to_dict() # Keep for re-rendering form on error
         try:
             job_type = request.form.get('job_type', 'web')
-            config = {'name': request.form.get('job_name', f'Job_{int(time.time())}').strip(),'description': request.form.get('description', '').strip(),'job_type': job_type,'output_dir': str(OUTPUT_DIR),'request_delay': float(request.form.get('request_delay', 1)),'max_retries': int(request.form.get('max_retries', 3)),'user_agent': request.form.get('user_agent', '').strip(),'respect_robots': 'respect_robots' in request.form,'proxies': []}
+            config = {
+                'name': request.form.get('job_name', f'Job_{int(time.time())}').strip(),
+                'description': request.form.get('description', '').strip(),
+                'job_type': job_type,
+                'output_dir': str(OUTPUT_DIR), # Base output dir
+                'request_delay': float(request.form.get('request_delay', 1)),
+                'max_retries': int(request.form.get('max_retries', 3)),
+                'user_agent': request.form.get('user_agent', '').strip() or None, # Set None if empty
+                'respect_robots': 'respect_robots' in request.form,
+                'proxies': [] # Add UI for proxies later if needed
+            }
             if not config['name']: flash('Job Name required.', 'error'); return render_template('configure.html', form_data=form_data_for_template)
+
+            # --- Web Job Specific Fields ---
             if job_type == 'web':
                  urls_input = request.form.get('urls', '').strip()
-                 if not urls_input: flash('Target URLs required.', 'error'); return render_template('configure.html', form_data=form_data_for_template)
+                 if not urls_input: flash('Target URLs required for Web Job.', 'error'); return render_template('configure.html', form_data=form_data_for_template)
                  config['urls'] = [url.strip() for url in urls_input.splitlines() if url.strip()]
                  config['dynamic'] = 'dynamic' in request.form
                  if config['dynamic']:
@@ -187,6 +227,7 @@ def configure_scraper():
                       if ws: config['wait_for_selector'] = ws
                       try: config['wait_time'] = float(wt) if float(wt) >= 0 else 5
                       except ValueError: config['wait_time'] = 5
+                      # Login Config (Only if dynamic)
                       login_url = request.form.get('login_url', '').strip()
                       if login_url:
                            login_cfg = {'login_url': login_url, 'username_selector': request.form.get('username_selector'), 'password_selector': request.form.get('password_selector'), 'submit_selector': request.form.get('submit_selector'), 'username': request.form.get('username_cred'), 'password': request.form.get('password_cred'), 'wait_after_login': float(request.form.get('wait_after_login', 3))}
@@ -197,8 +238,9 @@ def configure_scraper():
                            required_login_fields = ['username_selector', 'password_selector', 'submit_selector', 'username', 'password']
                            if not all(login_cfg.get(f) for f in required_login_fields): flash('Missing required login configuration fields.', 'error'); return render_template('configure.html', form_data=form_data_for_template)
                            config['login_config'] = login_cfg
+
                  item_selector = request.form.get('item_selector', '').strip()
-                 if not item_selector: flash('Item selector required.', 'error'); return render_template('configure.html', form_data=form_data_for_template)
+                 if not item_selector: flash('Item selector required for Web Job.', 'error'); return render_template('configure.html', form_data=form_data_for_template)
                  container_selector = request.form.get('container_selector', '').strip()
                  fields_dict = {}; f_names=request.form.getlist('field_name[]');f_sels=request.form.getlist('field_selector[]');f_attrs=request.form.getlist('field_attr[]')
                  valid_field=False
@@ -206,15 +248,20 @@ def configure_scraper():
                      n=n.strip();s=s.strip();a=a.strip()
                      if n and s: valid_field=True; fields_dict[n]=({'selector':s,'attr':a} if a else s)
                      elif n or s or a: flash(f'Incomplete field: Name="{n}", Selector="{s}", Attr="{a}". Skipped.','warning')
-                 if not valid_field: flash('Define at least one valid field.', 'error'); return render_template('configure.html', form_data=form_data_for_template)
+                 if not valid_field: flash('Define at least one valid field for Web Job.', 'error'); return render_template('configure.html', form_data=form_data_for_template)
                  config['selectors'] = {'type':request.form.get('selector_type','css'), **({'container':container_selector} if container_selector else {}), 'item':item_selector, 'fields':fields_dict}
                  next_page_sel = request.form.get('next_page_selector','').strip(); max_pg = request.form.get('max_pages','').strip()
-                 if next_page_sel: config['pagination']={'next_page_selector':next_page_sel}; config['pagination']['max_pages']=int(max_pg) if max_pg.isdigit() else float('inf')
+                 if next_page_sel or max_pg:
+                     config['pagination'] = {}
+                     if next_page_sel: config['pagination']['next_page_selector'] = next_page_sel
+                     if max_pg.isdigit(): config['pagination']['max_pages'] = int(max_pg)
+
+            # --- API Job Specific Fields ---
             elif job_type == 'api':
                  api_conf = {}; base_url = request.form.get('api_base_url','').strip()
-                 if not base_url: flash('Base URL required.', 'error'); return render_template('configure.html', form_data=form_data_for_template)
+                 if not base_url: flash('Base URL required for API Job.', 'error'); return render_template('configure.html', form_data=form_data_for_template)
                  eps = request.form.get('api_endpoints','').strip()
-                 if not eps: flash('Endpoints required.', 'error'); return render_template('configure.html', form_data=form_data_for_template)
+                 if not eps: flash('Endpoints required for API Job.', 'error'); return render_template('configure.html', form_data=form_data_for_template)
                  api_conf['base_url']=base_url; api_conf['endpoints']=[ep.strip() for ep in eps.splitlines() if ep.strip()]; api_conf['method']=request.form.get('api_method','GET')
                  try:
                       p=request.form.get('api_params','').strip(); h=request.form.get('api_headers','').strip(); d=request.form.get('api_data','').strip(); m=request.form.get('api_field_mappings','').strip()
@@ -223,22 +270,24 @@ def configure_scraper():
                       if d: api_conf['data'] = json.loads(d)
                       if m: api_conf['field_mappings'] = json.loads(m)
                  except json.JSONDecodeError as e: flash(f'Invalid JSON in API config: {e}','error'); return render_template('configure.html',form_data=form_data_for_template)
-                 # --- CORRECTED SYNTAX: Put 'if' on new line ---
                  dp = request.form.get('api_data_path','').strip()
-                 if dp:
-                     api_conf['data_path'] = dp
-                 # --- End Correction ---
+                 if dp: api_conf['data_path'] = dp
                  config['api_config'] = api_conf
+
+            # --- Common Fields (Processing Rules) ---
             processing_rules = parse_processing_rules(request.form)
             if processing_rules: config['processing_rules'] = processing_rules
-            config_loader.validate_config(config)
+
+            # --- Final Validation and Save ---
+            config_loader.validate_config(config) # Validate before saving
             safe_job_name = secure_filename(config['name']); timestamp = int(time.time()); config_filename = f"{safe_job_name}-{timestamp}.yaml"; config_path = CONFIG_DIR / config_filename
             with open(config_path, 'w', encoding='utf-8') as f: yaml.dump(config, f, sort_keys=False, default_flow_style=False, allow_unicode=True)
             logger.info(f"Config saved: {config_path}"); flash(f'Config "{config["name"]}" saved as {config_filename}!', 'success'); return redirect(url_for('index'))
+
         except JsonSchemaValidationError as e: error_path = " -> ".join(map(str, e.path)) or "Config root"; message = f"Config Error: {e.message} (at {error_path})"; logger.error(f"Validation failed: {message}"); flash(message, 'error'); return render_template('configure.html', form_data=form_data_for_template)
         except Exception as e: logger.exception(f"Error saving config: {e}"); flash(f'Error saving config: {e}', 'error'); return render_template('configure.html', form_data=form_data_for_template)
     # GET Request
-    return render_template('configure.html', form_data={'job_type': 'web'})
+    return render_template('configure.html', form_data={'job_type': 'web'}) # Default to showing web options
 
 @app.route('/run/<config_file>', endpoint='run_job')
 def run_scraper(config_file):
@@ -248,17 +297,31 @@ def run_scraper(config_file):
     try:
         config = config_loader.load_config(str(config_path)); logger.debug(f"Loaded config: {config}")
         job_type = config.get('job_type', 'web'); output_format = request.args.get('format', 'csv')
-        job_output_dir = OUTPUT_DIR / Path(safe_filename).stem; job_output_dir.mkdir(parents=True, exist_ok=True)
+        # Create job-specific output directory using secure name
+        safe_job_name_for_dir = "".join(c if c.isalnum() else '_' for c in config.get('name', 'job'))
+        job_output_dir = OUTPUT_DIR / safe_job_name_for_dir; job_output_dir.mkdir(parents=True, exist_ok=True)
+
         config_for_run = config.copy(); config_for_run['output_dir'] = str(job_output_dir)
         scraper_instance = None
-        if job_type == 'api': logger.info("Using APIScraper"); scraper_instance = APIScraper(config_for_run)
+
+        # --- Instantiate correct scraper ---
+        if job_type == 'api':
+             logger.info("Using APIScraper")
+             scraper_instance = APIScraper(config_for_run)
         elif job_type == 'web':
-             if config_for_run.get('dynamic', False): scraper_instance = DynamicScraper(config_for_run)
-             else: scraper_instance = HTMLScraper(config_for_run)
-             logger.info(f"Using {scraper_instance.__class__.__name__}")
-        else: raise ValueError(f"Invalid job_type '{job_type}'.")
+             if config_for_run.get('dynamic', False):
+                 scraper_instance = DynamicScraper(config_for_run)
+                 logger.info(f"Using DynamicScraper (Headless: {config_for_run.get('headless', True)})")
+             else:
+                 scraper_instance = HTMLScraper(config_for_run)
+                 logger.info("Using HTMLScraper")
+        else:
+             raise ValueError(f"Invalid job_type '{job_type}'.")
+        # --- End Instantiation ---
+
         result = scraper_instance.run(); logger.info(f"Run completed. Stats: {result.get('stats')}")
         output_path_str = ""; data_to_save = result.get('data')
+
         if data_to_save:
             storage = None; fmt_lower = output_format.lower(); storage_cfg=config_for_run
             if fmt_lower == 'csv': storage = CSVStorage(storage_cfg)
@@ -266,17 +329,21 @@ def run_scraper(config_file):
             elif fmt_lower == 'sqlite': storage = SQLiteStorage(storage_cfg)
             else: flash(f"Unsupported format '{output_format}'.", "error"); return render_template('results.html', job_name=config.get('name', safe_filename), output_path="Error", stats=result.get('stats',{}), sample_data=data_to_save[:10])
             try:
-                 output_path_str = storage.save(data_to_save)
+                 # Filename is now generated by the storage handler based on config name
+                 output_path_str = storage.save(data_to_save) # Pass filename=None
                  logger.info(f"Results saved to: {output_path_str}"); flash(f'Success! Results saved ({output_format.upper()}).', 'success')
             except Exception as e:
                  logger.error(f"Failed to save results: {e}", exc_info=True); flash(f"Failed to save results: {e}", "error"); output_path_str = f"Error saving: {e}"
         else: flash('Scraping finished, but no data was collected or saved.', 'warning'); output_path_str = "N/A"
+
         relative_path_str = "N/A"
         if output_path_str and output_path_str != "N/A" and "Error" not in output_path_str:
              try: relative_path = Path(output_path_str).relative_to(Path.cwd()); relative_path_str = str(relative_path)
              except (ValueError, TypeError): relative_path_str = output_path_str
         elif "Error" in output_path_str: relative_path_str = output_path_str
+
         return render_template('results.html', job_name=config.get('name', safe_filename), output_path=relative_path_str, output_format=output_format.upper(), stats=result.get('stats',{}), sample_data=data_to_save[:10] if data_to_save else [])
+
     except (JsonSchemaValidationError, yaml.YAMLError) as e: error_path = " -> ".join(map(str, getattr(e, 'path', []))) or "Config root"; message = f"Config Error running {safe_filename}: {getattr(e, 'message', str(e))} (at {error_path})"; logger.error(message); flash(message, 'error'); return redirect(url_for('index'))
     except Exception as e: logger.exception(f"Error running job {safe_filename}: {e}"); flash(f"Scraping failed for '{config.get('name', safe_filename)}': {e}", 'error'); return render_template('error.html', error=str(e), config_file=safe_filename)
 

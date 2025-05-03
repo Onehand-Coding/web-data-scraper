@@ -1,10 +1,10 @@
 # File: web-data-scraper/scraper/api_scraper.py (Corrected)
 
-import time
+import time # <-- Added import
 import requests
 from typing import Dict, List, Optional, Any
 from .base_scraper import BaseScraper
-import json
+import json # <-- Added import
 import logging
 
 # --- Helper function for nested access ---
@@ -76,8 +76,8 @@ class APIScraper(BaseScraper):
         if response_text:
             try:
                 # Attempt to parse JSON
-                return json.loads(response_text)
-            except json.JSONDecodeError as e:
+                return json.loads(response_text) # <-- Use imported json
+            except json.JSONDecodeError as e: # <-- Use imported json
                 self.logger.error(f"Failed to decode JSON response from {full_url}: {e}")
                 self.logger.debug(f"Response text was: {response_text[:500]}") # Log response start
                 # Consider if we should count this as a page failure in stats?
@@ -120,9 +120,10 @@ class APIScraper(BaseScraper):
 
             field_mappings = self.api_config.get('field_mappings')
             if not field_mappings:
+                 # If no mappings, assume the items are already dictionaries in the desired format
                  processed_items = [item for item in items if isinstance(item, dict)]
                  if len(processed_items) != len(items):
-                      self.logger.warning("Some items in the API response were not dictionaries and were skipped.")
+                      self.logger.warning("Some items in the API response were not dictionaries and were skipped (no field mappings defined).")
             else:
                  self.logger.debug(f"Applying field mappings: {field_mappings}")
                  for i, item in enumerate(items):
@@ -143,13 +144,13 @@ class APIScraper(BaseScraper):
 
     def run(self) -> Dict:
         """Execute API scraping job."""
-        self.stats['start_time'] = time.time() # Reset start time directly
+        self.stats['start_time'] = time.time() # <-- Use imported time
         all_extracted_data = []
         endpoints = self.api_config.get('endpoints', [])
 
         if not endpoints:
             self.logger.warning("No API endpoints defined in 'api_config'.")
-            self.stats['end_time'] = time.time()
+            self.stats['end_time'] = time.time() # <-- Use imported time
             return {'data': [], 'stats': self.get_stats(), 'config': self.config}
 
         for endpoint in endpoints:
@@ -167,7 +168,7 @@ class APIScraper(BaseScraper):
 
         processed_data = self._process_extracted_data(all_extracted_data)
 
-        self.stats['end_time'] = time.time()
+        self.stats['end_time'] = time.time() # <-- Use imported time
         return {
             'data': processed_data,
             'stats': self.get_stats(),
