@@ -33,7 +33,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Setup logging
 log_level = logging.DEBUG if app.debug else logging.INFO
-setup_logging(log_filename='web_app.log', level=log_level, console_level=log_level)
+setup_logging(log_filename='flask_ui.log', level=log_level, console_level=log_level)
 logger = logging.getLogger(__name__)
 config_loader = ConfigLoader()
 

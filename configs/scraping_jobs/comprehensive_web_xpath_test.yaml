@@ -1,0 +1,79 @@
+name: "Comprehensive Dynamic XPath Test"
+description: "Tests dynamic scraping with XPath, login, all rule types, pagination, proxies, and SQLite output for quotes.toscrape.com."
+job_type: web
+urls:
+  - "http://quotes.toscrape.com/" # Target page after login
+
+# Dynamic Scraper Options
+dynamic: true
+headless: true
+disable_images: true
+page_load_timeout: 40
+webdriver_path: "" # Optional
+wait_for_selector: "//div[@class='quote']"
+wait_time: 3
+
+login_config:
+  login_url: "http://quotes.toscrape.com/login"
+  username_selector: "//input[@id='username']"              # WAS: #username
+  password_selector: "//input[@id='password']"              # WAS: #password
+  submit_selector: "//input[@type='submit' and @value='Login']" # WAS: input[type='submit'][value='Login']
+  username: "user"
+  password: "password"
+  success_selector: "//a[@href='/logout']"      # WAS: a[href='/logout']
+  wait_after_login: 3
+
+selectors:
+  type: xpath
+  item: "//div[@class='quote']" # This selects the parent item element
+  fields:
+    quote_text: ".//span[@class='text']"  # XPath to the <span> element containing the quote
+    author_name: ".//small[@class='author']" # XPath to the <small> element containing the author
+    # For author_url, we select the <a> element and specify 'href' as the attribute to extract
+    author_url:
+      selector: ".//small[@class='author']/following-sibling::a" # XPath to the <a> element
+      attr: "href"                                              # Specify 'href' attribute here
+    # For tags, select all relevant <a> elements.
+    # The scraper will get the text of each and join them.
+    tags: ".//div[@class='tags']/a[@class='tag']" # XPath to the <a> tag elements
+
+pagination:
+  next_page_selector: "//li[@class='next']/a/@href"
+  max_pages: 2
+
+proxies: [] # Replace with actual testable proxies if available
+  # - http: "http://dummyproxy1.com:8080"
+  # - https: "http://dummyproxy1.com:8080"
+
+output_format: sqlite
+
+processing_rules:
+  field_types:
+    quote_text: {type: "string"}
+    author_url: {type: "string"}
+  text_cleaning:
+    quote_text:
+      trim: true
+      remove_newlines: true
+      remove_extra_spaces: true
+      regex_replace: {'^“|”$': '', '^"|"$"': ''}
+    author_name:
+      trim: true
+      uppercase: true
+    tags:
+      lowercase: true
+  validations:
+    quote_text: {required: true, min_length: 10}
+    author_name: {required: true}
+    author_url: {required: false, pattern: "^/author/"}
+  transformations:
+    author_initial: |
+      item.get('author_name', '')[0] if item.get('author_name') else None
+    quote_length: "len(item.get('quote_text', ''))"
+  drop_fields:
+    - "author_url"
+
+request_delay: 1
+max_retries: 2
+user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) TestRig/1.0 Comprehensive"
+respect_robots: true

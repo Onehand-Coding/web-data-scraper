@@ -1,12 +1,10 @@
-# File: configs/api_test_jsonplaceholder.yaml (Corrected)
-
 name: "API Test - JSONPlaceholder Users"
 description: "Fetch user data from JSONPlaceholder API"
-job_type: api # Set job type to api
+job_type: api
 
-api_config: # Define the API specific configuration
-  base_url: "https://jsonplaceholder.typicode.com" # Required
-  endpoints: # Required - list of endpoints to hit
+api_config:
+  base_url: "https://jsonplaceholder.typicode.com"
+  endpoints:
     - "/users"
   # Optional fields below:
   method: "GET"
@@ -16,15 +14,15 @@ api_config: # Define the API specific configuration
   field_mappings: # Optional: Rename fields
     user_id: "id"
     full_name": "name"
-    email: "email"       # Ensure this key is correct
-    city: "address.city" # Ensure this key is correct
+    email: "email"
+    city: "address.city"
     company_name: "company.name"
 
-processing_rules: # Optional processing rules
+processing_rules:
     text_cleaning:
       full_name: {trim: True}
     validations:
-      email: {required: true, pattern: "^.+@.+\\..+$"} # Ensure 'email' key is correct
+      email: {required: true, pattern: "^.+@.+\\..+$"}
 
-output_dir: "outputs/api_test" # Specify output directory
+output_dir: "outputs/api_test"
 # proxies: [] # Add if testing API through proxies

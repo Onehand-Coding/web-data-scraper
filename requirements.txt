@@ -6,4 +6,5 @@ PyYAML>=6.0
 Flask>=2.0.0
 pandas>=1.3.0
 jsonschema>=4.0.0
-lxml>=4.6.0  # Optional: Needed if you implement XPath in html_scraper
+lxml>=4.6.0
+streamlit>=1.0.0

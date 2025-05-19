@@ -1,5 +1,3 @@
-# File: configs/quotes_paged_proxies.yaml (Example with Proxies)
-
 name: Quotes Scraper Test - Paged with Proxies
 description: Test scraping multiple pages with proxy rotation.
 urls:

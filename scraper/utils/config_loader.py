@@ -247,6 +247,12 @@ class ConfigLoader:
             # --- Common / General ---
             "processing_rules": PROCESSING_RULES_SCHEMA, # Schema defined above
             "output_dir": {"type": "string", "default": "outputs", "description": "Base directory for output files"},
+            "output_format": {
+                "type": "string",
+                "enum": ["csv", "json", "sqlite"],
+                "default": "csv",
+                "description": "Default format for saving the primary output file."
+            },
             "request_delay": {"type": "number", "minimum": 0, "default": 1, "description": "Delay in seconds between requests"},
             "max_retries": {"type": "integer", "minimum": 0, "default": 3, "description": "Max retries on failed requests"},
             "user_agent": {"type": "string", "description": "Custom User-Agent string"},
@@ -299,6 +305,7 @@ class ConfigLoader:
     def generate_sample_config(self, output_path: str) -> None:
         # Define sample configs (keep them concise for clarity)
         sample_config_web = {
+            "output_format": "csv",
             "name": "Sample Dynamic Job with Login", "description": "Example config for scraping dynamic site requiring login",
             "job_type": "web", "urls": ["https://quotes.toscrape.com/"], # Changed URL
             "dynamic": True,
@@ -317,6 +324,7 @@ class ConfigLoader:
         api_sample = {
              "name": "Sample API Job - JSONPlaceholder Users", "job_type": "api",
              "api_config": {
+                 "output_format": "json",
                  "base_url": "https://jsonplaceholder.typicode.com",
                  "endpoints": ["/users"],
                  "method": "GET",
