@@ -1,13 +1,8 @@
-# File: web-data-scraper/scraper/utils/config_loader.py (Updated)
-
 import yaml
-from typing import Dict, Any, List
-from pathlib import Path
 import logging
+from pathlib import Path
+from typing import Dict, Any, List, Optional
 from jsonschema import validate, ValidationError
-# import json # Not needed directly
-
-# --- Define Schemas *BEFORE* the Class ---
 
 # --- API Config Schema ---
 API_CONFIG_SCHEMA = {
@@ -302,57 +297,130 @@ class ConfigLoader:
         # Add specific checks for selector types if needed (e.g., XPath vs CSS)
         return True
 
-    def generate_sample_config(self, output_path: str) -> None:
-        # Define sample configs (keep them concise for clarity)
+    def generate_sample_config(self, output_filename_base: Optional[str] = None) -> List[str]:
+        """
+        Generates sample configuration files (one for web, one for API)
+        and saves them to a 'configs/generated_samples/' subdirectory.
+        Creates the directory if it doesn't exist.
+
+        Args:
+            output_filename_base: Optional base name for the web config file.
+                                  API config will have '_api_example' appended.
+                                  If None, defaults are 'sample_web_config.yaml'
+                                  and 'sample_api_config.yaml'.
+
+        Returns:
+            A list of paths to the generated sample config files.
+        """
+        # Define the target directory
+        sample_config_dir = Path("configs") / "generated_samples"
+        try:
+            sample_config_dir.mkdir(parents=True, exist_ok=True)
+            self.logger.info(f"Ensured sample config directory exists: {sample_config_dir.resolve()}")
+        except OSError as e:
+            self.logger.error(f"Error creating sample config directory {sample_config_dir}: {e}")
+            # Fallback to current directory if creation fails
+            sample_config_dir = Path(".")
+
+        # Define default filenames if base is not provided
+        default_web_filename = "sample_web_config.yaml"
+        default_api_filename = "sample_api_config.yaml"
+
+        if output_filename_base:
+            # Ensure it ends with .yaml or .yml
+            if not (output_filename_base.endswith(".yaml") or output_filename_base.endswith(".yml")):
+                web_config_filename = f"{output_filename_base}_web.yaml"
+                api_config_filename = f"{output_filename_base}_api.yaml"
+            else: # User provided full filename with extension
+                web_config_filename = output_filename_base
+                base_stem = Path(output_filename_base).stem
+                api_config_filename = f"{base_stem}_api_example.yaml"
+
+        else:
+            web_config_filename = default_web_filename
+            api_config_filename = default_api_filename
+
+        web_config_path = sample_config_dir / web_config_filename
+        api_config_path = sample_config_dir / api_config_filename
+
+        # --- Sample Web Config ---
         sample_config_web = {
-            "output_format": "csv",
-            "name": "Sample Dynamic Job with Login", "description": "Example config for scraping dynamic site requiring login",
-            "job_type": "web", "urls": ["https://quotes.toscrape.com/"], # Changed URL
+            "name": "Sample Dynamic Web Job",
+            # ... (rest of your sample_config_web definition, ensure it's complete and up-to-date) ...
+             "description": "Example config for scraping a dynamic website, possibly requiring login.",
+            "job_type": "web",
+            "urls": [
+                "http://quotes.toscrape.com/js/"
+            ],
             "dynamic": True,
-            "wait_for_selector": "div.quote", "headless": True, "page_load_timeout": 30, "wait_time": 3,
-            "login_config": {
-                "login_url": "https://quotes.toscrape.com/login", "username_selector": "#username",
-                "password_selector": "#password", "submit_selector": "input[type='submit']",
-                "username": "testuser", "password": "password", "success_selector": "a[href='/logout']",
-                "wait_after_login": 2
+            "headless": True,
+            "disable_images": True,
+            "page_load_timeout": 30,
+            # "webdriver_path": "/path/to/your/chromedriver", # Optional
+            "wait_for_selector": "div.quote",
+            "wait_time": 3,
+            # "login_config": { ... }, # Keep commented out or provide a very simple dummy
+            "selectors": {
+                "type": "css", # Defaulting to CSS for simplicity in sample
+                "item": "div.quote",
+                "fields": {
+                    "quote_text": "span.text",
+                    "author_name": "small.author",
+                    "tags": "div.tags a.tag"
+                }
             },
-            "selectors": { "type": "css", "item": "div.quote", "fields": { "quote_text": "span.text", "author": "small.author" } },
-            "pagination": { "next_page_selector": "li.next a", "max_pages": 2 }, "proxies": [],
-            "processing_rules": { "text_cleaning": {"author": {"uppercase": True}}, "validations": {"quote_text": {"required": True}}},
-            "output_dir": "outputs/sample_dynamic_login", "request_delay": 1, "max_retries": 2, "user_agent": "SampleScraper/1.0", "respect_robots": True
+            "pagination": {
+                "next_page_selector": "li.next > a",
+                "max_pages": 2
+            },
+            "output_format": "csv",
+            "processing_rules": {
+                "text_cleaning": {
+                    "author_name": {"trim": True, "uppercase": True}
+                }
+            },
+            "request_delay": 1,
+            "max_retries": 3,
+            "user_agent": "MySampleScraper/1.0"
         }
+
+        # --- Sample API Config ---
         api_sample = {
-             "name": "Sample API Job - JSONPlaceholder Users", "job_type": "api",
-             "api_config": {
-                 "output_format": "json",
-                 "base_url": "https://jsonplaceholder.typicode.com",
-                 "endpoints": ["/users"],
-                 "method": "GET",
-                 "data_path": "", # Process root list
-                 "field_mappings": { "user_id": "id", "full_name": "name", "email": "email", "city": "address.city" }
-             },
-             "processing_rules": {
-                 "text_cleaning": {"full_name": {"trim": True}},
-                 "validations": {"email": {"required": True, "pattern": r".+@.+\..+"}}
-             },
-             "output_dir": "outputs/sample_api", "request_delay": 0.5
+            "name": "Sample API Job - JSONPlaceholder",
+            # ... (rest of your api_sample definition, ensure it's complete and up-to-date) ...
+            "job_type": "api",
+            "api_config": {
+                "base_url": "https://jsonplaceholder.typicode.com",
+                "endpoints": ["/users/1"],
+                "method": "GET",
+                "field_mappings": {
+                    "id_user": "id",
+                    "name_user": "name",
+                    "email_user": "email"
+                }
+            },
+            "output_format": "json",
+            "processing_rules": {
+                "field_types": {"id_user": {"type": "int"}}
+            },
+            "request_delay": 0.5
         }
+
+        generated_files = []
+        try:
+            with open(web_config_path, 'w', encoding='utf-8') as f_web:
+                yaml.dump(sample_config_web, f_web, sort_keys=False, default_flow_style=False, allow_unicode=True)
+            self.logger.info(f"Generated sample web config: {web_config_path.resolve()}")
+            generated_files.append(str(web_config_path.resolve()))
+        except Exception as e:
+            self.logger.error(f"Error writing sample web config to {web_config_path}: {e}")
 
         try:
-            # Save the DYNAMIC sample config (use output_path provided)
-            web_sample_path = Path(output_path)
-            with open(web_sample_path, 'w', encoding='utf-8') as f:
-                 yaml.dump(sample_config_web, f, sort_keys=False, default_flow_style=False, allow_unicode=True)
-            self.logger.info(f"Sample WEB configuration generated at: {web_sample_path}")
-
-            # Save API sample too (derive name)
-            api_output_path = web_sample_path.parent / f"{web_sample_path.stem}_api_example.yaml"
-            if api_output_path == web_sample_path: # Avoid overwriting if name is same
-                 api_output_path = web_sample_path.parent / f"{web_sample_path.stem}_api.yaml"
-            with open(api_output_path, 'w', encoding='utf-8') as f:
-                  yaml.dump(api_sample, f, sort_keys=False, default_flow_style=False, allow_unicode=True)
-            self.logger.info(f"Sample API configuration generated at: {api_output_path}")
-
+            with open(api_config_path, 'w', encoding='utf-8') as f_api:
+                yaml.dump(api_sample, f_api, sort_keys=False, default_flow_style=False, allow_unicode=True)
+            self.logger.info(f"Generated sample API config: {api_config_path.resolve()}")
+            generated_files.append(str(api_config_path.resolve()))
         except Exception as e:
-             self.logger.error(f"Failed to generate sample config files: {e}", exc_info=True)
-             raise
+            self.logger.error(f"Error writing sample API config to {api_config_path}: {e}")
+
+        return generated_files

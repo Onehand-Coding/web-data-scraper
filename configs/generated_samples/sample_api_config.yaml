@@ -1,0 +1,17 @@
+name: Sample API Job - JSONPlaceholder
+job_type: api
+api_config:
+  base_url: https://jsonplaceholder.typicode.com
+  endpoints:
+  - /users/1
+  method: GET
+  field_mappings:
+    id_user: id
+    name_user: name
+    email_user: email
+output_format: json
+processing_rules:
+  field_types:
+    id_user:
+      type: int
+request_delay: 0.5

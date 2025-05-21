@@ -1,0 +1,30 @@
+name: Sample Dynamic Web Job
+description: Example config for scraping a dynamic website, possibly requiring login.
+job_type: web
+urls:
+- http://quotes.toscrape.com/js/
+dynamic: true
+headless: true
+disable_images: true
+page_load_timeout: 30
+wait_for_selector: div.quote
+wait_time: 3
+selectors:
+  type: css
+  item: div.quote
+  fields:
+    quote_text: span.text
+    author_name: small.author
+    tags: div.tags a.tag
+pagination:
+  next_page_selector: li.next > a
+  max_pages: 2
+output_format: csv
+processing_rules:
+  text_cleaning:
+    author_name:
+      trim: true
+      uppercase: true
+request_delay: 1
+max_retries: 3
+user_agent: MySampleScraper/1.0

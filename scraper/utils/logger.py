@@ -1,5 +1,3 @@
-# File: web-data-scraper/scraper/utils/logger.py
-
 """
 Logging configuration and utilities.
 """

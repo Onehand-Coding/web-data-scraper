@@ -1,6 +1,4 @@
-# File: web-data-scraper/scraper/storage/json_handler.py (Corrected)
-
-import time # <-- Added import
+import time
 import json
 from pathlib import Path
 from typing import List, Dict

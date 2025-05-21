@@ -1,16 +1,13 @@
-# File: web-data-scraper/interfaces/cli.py (Updated)
-
-import typer
-from typing import Optional, Dict
+import time
 import yaml
+import typer
+import logging
 from pathlib import Path
+from typing import Optional, List
 from jsonschema import ValidationError
-import logging # Import logging
-import time # Import time
 
-# --- Import APIScraper ---
+# --- Scraper imports ---
 from scraper.api_scraper import APIScraper
-# --- Keep other scraper imports ---
 from scraper.html_scraper import HTMLScraper
 from scraper.dynamic_scraper import DynamicScraper
 # Storage imports
@@ -22,7 +19,10 @@ from scraper.utils.logger import setup_logging
 from scraper.utils.config_loader import ConfigLoader
 
 app = typer.Typer(help="Web Scraper Framework")
+config_loader_cli_instance = ConfigLoader()
+logger_cli = logging.getLogger(__name__)
 
+# --- run_scraper command ---
 @app.command("run")
 def run_scraper(
     config_file: Path = typer.Argument(..., help="Path to config YAML file", exists=True, readable=True, show_default=False),
@@ -31,21 +31,17 @@ def run_scraper(
 ):
     """Run scraping job based on configuration file."""
     setup_logging(log_filename='cli_scraper.log', level=logging.INFO, console_level=logging.INFO)
-    config_loader = ConfigLoader()
-    logger = logging.getLogger(__name__)
 
     try:
-        config = config_loader.load_config(str(config_file))
-        # Store CLI options in config if they need to override file values
-        if config.get('dynamic'): # Only override headless if it's a dynamic job
+        config = config_loader_cli_instance.load_config(str(config_file))
+        if config.get('dynamic'):
             config['headless'] = headless
 
-        job_type = config.get('job_type', 'web') # Default to web if not specified
+        job_type = config.get('job_type', 'web')
         typer.echo(f"Running job: {config.get('name', 'Unnamed Job')} (Type: {job_type.upper()})")
         typer.echo(f"Output format: {output_format}")
-        logger.info(f"Loaded configuration from: {config_file}")
+        logger_cli.info(f"Loaded configuration from: {config_file}")
 
-        # --- Select appropriate scraper based on job_type ---
         scraper_instance = None
         if job_type == 'api':
              typer.echo("Using API Scraper")
@@ -58,19 +54,14 @@ def run_scraper(
                 typer.echo("Using HTML Web Scraper (BeautifulSoup)")
                 scraper_instance = HTMLScraper(config)
         else:
-             # Should be caught by config validation if enum is correct
              typer.echo(f"Error: Unknown job_type '{job_type}' in configuration.", err=True)
              raise typer.Exit(1)
-        # --- End Scraper Selection ---
 
-        # Execute scraping
         result = scraper_instance.run()
 
-        # --- Storage Handling (remains mostly the same) ---
         storage = None
         output_format_lower = output_format.lower()
         output_base_dir = Path(config.get('output_dir', 'outputs'))
-        # Use secure_filename logic or sanitize job name for directory
         safe_job_name_for_dir = "".join(c if c.isalnum() else '_' for c in config.get('name', 'job'))
         job_output_dir = output_base_dir / safe_job_name_for_dir
         job_output_dir.mkdir(parents=True, exist_ok=True)
@@ -82,10 +73,8 @@ def run_scraper(
         elif output_format_lower == 'sqlite': storage = SQLiteStorage(storage_config)
         else: typer.echo(f"Error: Unsupported output format '{output_format}'.", err=True); raise typer.Exit(1)
 
-        # Save results
         if result.get('data'):
-            # Filename generation is now handled within storage handlers
-            output_path = storage.save(result['data']) # Pass None for filename
+            output_path = storage.save(result['data'])
             typer.echo(f"\nScraping completed successfully!")
             typer.echo(f"Results saved to: {output_path}")
             typer.echo(f"Statistics: {result.get('stats', {})}")
@@ -94,43 +83,48 @@ def run_scraper(
             typer.echo(f"Statistics: {result.get('stats', {})}")
 
     except (ValidationError, yaml.YAMLError) as e:
-        logger.error(f"Configuration Error in {config_file}: {e}", exc_info=False) # Don't need full traceback for validation error
+        logger_cli.error(f"Configuration Error in {config_file}: {e}", exc_info=False)
         typer.echo(f"Configuration Error in {config_file}: {e}", err=True)
         raise typer.Exit(1)
     except FileNotFoundError as e:
-         logger.error(f"Configuration file not found: {e}")
+         logger_cli.error(f"Configuration file not found: {e}")
          typer.echo(f"Error: Config file not found at '{config_file}'", err=True)
          raise typer.Exit(1)
     except Exception as e:
-        logger.exception(f"An unexpected error occurred during scraping: {e}") # Log full traceback
+        logger_cli.exception(f"An unexpected error occurred during scraping: {e}")
         typer.echo(f"\nScraping failed with an unexpected error: {e}", err=True)
         raise typer.Exit(1)
 
 
 @app.command("generate-config")
-def generate_config(
-    output_file: Path = typer.Argument("scraping_config.yaml", help="Output config file path for WEB sample", writable=True, resolve_path=True),
-    # api_output_file: Optional[Path] = typer.Option(None, "--api-sample", help="Output path for API sample config") # Option for separate API file
+def generate_config_command( # Renamed from generate_config to avoid conflict if imported elsewhere
+    filename_base: Optional[str] = typer.Argument(
+        None, # Default to None, so ConfigLoader uses its internal defaults
+        help="Optional base name for the generated web config file (e.g., 'my_scraper'). "
+             "API config will be named similarly. Files are saved in 'configs/generated_samples/'."
+    )
 ):
-    """Generate sample WEB and API configuration files."""
+    """Generates sample WEB and API configuration files in 'configs/generated_samples/'."""
     setup_logging(log_filename='cli_utils.log', level=logging.INFO, console_level=logging.INFO)
-    config_loader = ConfigLoader()
-    logger = logging.getLogger(__name__)
+    # Use the module-level instance or create a new one
+    # config_loader_instance = ConfigLoader()
+
     try:
-        web_path = output_file
-        api_path = web_path.parent / f"{web_path.stem}_api_example.yaml"
+        # The ConfigLoader.generate_sample_config method now handles directory creation
+        # and default naming if filename_base is None.
+        generated_files: List[str] = config_loader_cli_instance.generate_sample_config(filename_base)
 
-        if web_path.exists(): typer.confirm(f"File '{web_path}' already exists. Overwrite?", abort=True)
-        if api_path.exists(): typer.confirm(f"File '{api_path}' also exists. Overwrite?", abort=True)
-
-        # generate_sample_config now creates both files
-        config_loader.generate_sample_config(str(web_path))
-        typer.echo(f"Sample WEB config written to: {web_path}")
-        typer.echo(f"Sample API config written to: {api_path}")
+        if generated_files:
+            typer.echo("Sample configuration files generated successfully:")
+            for file_path in generated_files:
+                typer.echo(f"- {file_path}")
+        else:
+            # This case might occur if ConfigLoader itself logs an error and returns empty
+            typer.echo("Failed to generate sample files. Please check 'logs/cli_utils.log' and 'logs/config_loader.log'.")
 
     except Exception as e:
-        logger.exception(f"Failed to generate config file(s): {e}")
-        typer.echo(f"Failed to generate config: {e}", err=True)
+        logger_cli.exception(f"Failed to generate config file(s): {e}")
+        typer.echo(f"Failed to generate sample configs: {e}", err=True)
         raise typer.Exit(1)
 
 if __name__ == "__main__":

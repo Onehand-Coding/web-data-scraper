@@ -43,7 +43,15 @@ A powerful, flexible Python-based framework for automated web data extraction th
 ```
 web-data-scraper/
 ├── configs/
-│   └── scraping_jobs/      # User-defined job YAML configurations
+│   ├── generated_samples/  # Default output for CLI's generate-config
+│   │   ├── sample_web_config.yaml
+│   │   └── sample_api_config.yaml
+│   └── scraping_jobs/      # User-defined job YAML configurations (from UI)
+│       ├── comprehensive_web_xpath_test.yaml
+│       ├── comprehensive_api_test.yaml
+│       ├── comprehensive_static_css_test.yaml
+│       └── comprehensive_dynamic_css_proxies_test.yaml
+│
 ├── interfaces/
 │   ├── cli.py              # Command Line Interface
 │   ├── flask_ui/           # Legacy Flask Web UI
@@ -51,8 +59,8 @@ web-data-scraper/
 │   │   └── templates/
 │   └── streamlit_ui/       # Primary Streamlit Web UI
 │       └── app.py
-├── logs/                   # Log files directory
-├── outputs/                # Scraped data output directory
+├── logs/                   # Log files directory (Git ignored)
+├── outputs/                # Scraped data output directory (Git ignored)
 ├── scraper/
 │   ├── storage/            # Data storage handlers
 │   │   ├── base_storage.py
