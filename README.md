@@ -43,8 +43,7 @@ A powerful, flexible Python-based framework for automated web data extraction th
 ```
 web-data-scraper/
 ├── configs/
-│   ├── scraping_jobs/      # User-defined job YAML configurations
-│   └──                     # General reference example
+│   └── scraping_jobs/      # User-defined job YAML configurations
 ├── interfaces/
 │   ├── cli.py              # Command Line Interface
 │   ├── flask_ui/           # Legacy Flask Web UI
