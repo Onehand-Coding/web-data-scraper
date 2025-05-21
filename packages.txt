@@ -3,7 +3,6 @@ libglib2.0-0
 libnss3
 libgconf-2-4
 libfontconfig1
-# The following are often helpful too for headless Chrome on Linux
 libx11-xcb1
 libxcomposite1
 libxdamage1
