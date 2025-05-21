@@ -1,0 +1,84 @@
+# Purpose: Comprehensive test for API Scraper.
+# Includes: multiple endpoints, field mappings, data path, all processing rule types, JSON output.
+
+name: "Comprehensive API Test - JSONPlaceholder"
+description: "Tests multiple endpoints, field mappings, data path, all rule types for an API job, outputting to JSON using JSONPlaceholder."
+job_type: api # Indicates an API scraping job
+
+# --- API Configuration ---
+api_config:
+  base_url: "https://jsonplaceholder.typicode.com"
+  endpoints:
+    - "/users"   # Fetches a list of user objects
+    - "/posts/1" # Fetches a single post object
+    # Note: The current APIScraper processes each endpoint and concatenates results.
+    # If an endpoint returns a single object not in a list, it will be treated as a list with one item.
+  method: "GET" # Default, can be overridden per endpoint if backend supports it
+  # params: {"param_all_endpoints": "value"} # Global parameters for all endpoints
+  # headers: {"X-Global-Header": "GlobalValue"} # Global headers
+
+  # data_path: ""
+  # For /users, the root of the response is the list of items.
+  # For /posts/1, the root is the single item object.
+  # If data_path was "data.items", it would look for results inside an "items" list under a "data" key.
+
+  field_mappings:
+    # These mappings apply to objects found at the data_path (or root if data_path is empty)
+    # For items from /users endpoint:
+    user_id: "id"
+    full_name: "name"
+    username: "username"
+    email_address: "email"
+    city: "address.city" # Dot notation for nested objects
+    company_bs_original: "company.bs" # Keep original for transformation demo
+
+    # For item from /posts/1 endpoint (these will map if keys exist in the post object):
+    post_id_single: "id"
+    post_title_single: "title"
+    post_body: "body"
+
+# --- Output Configuration ---
+output_format: json # Target output format
+
+# --- Data Processing Rules ---
+# These rules are applied *after* all data from all endpoints is collected and mapped.
+processing_rules:
+  field_types:
+    user_id: {type: "int"}
+    post_id_single: {type: "int"}
+    # Example: If a field was 'latitude', you might have:
+    # latitude: {type: "float"}
+  text_cleaning:
+    full_name:
+      trim: true
+      uppercase: true # Convert full_name to uppercase
+    username:
+      lowercase: true # Convert username to lowercase
+    company_bs_original: # Clean before it's dropped (just for demo)
+      regex_replace: {" ": "_"} # Replace spaces with underscores
+    post_title_single:
+      trim: true
+    post_body:
+      remove_newlines: true # Replace newlines with spaces
+      remove_extra_spaces: true
+  validations:
+    email_address: {required: true, pattern: "^[\\w\\.-]+@[\\w\\.-]+\\.\\w+$"}
+    username: {min_length: 3, max_length: 25} # Add max_length example
+    post_title_single: {required: true}
+    user_id: {required: true} # Ensure user_id is present for user items
+  transformations:
+    # Create a new field for user items
+    name_and_email: "f\"{item.get('full_name', '')} <{item.get('email_address', '')}>\" if item.get('full_name') and item.get('email_address') else None"
+    # Create a new field from company_bs_original before it's dropped
+    company_bs_transformed: "item.get('company_bs_original', '').upper().replace(' ', '-') if item.get('company_bs_original') else None"
+    # Add a source field to distinguish items from different endpoints
+    data_source: "'post_detail' if 'post_id_single' in item else ('user_list' if 'user_id' in item else 'unknown')"
+  drop_fields:
+    - "company_bs_original" # Drop the original after transforming it
+    - "phone"               # Example of dropping a field that might come from /users
+
+# --- Common Scraper Options ---
+request_delay: 0.2 # APIs can often handle faster requests than web pages
+max_retries: 3
+user_agent: "MyComprehensiveAPITester/1.2"
+# respect_robots: false # Typically not applicable for APIs, but can be set.

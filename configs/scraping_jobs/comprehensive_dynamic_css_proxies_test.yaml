@@ -1,0 +1,75 @@
+# Purpose: Comprehensive test for Dynamic Web Scraper using CSS selectors with proxies.
+# Includes: pagination, all processing rule types, JSON output, no login.
+# Uses quotes.toscrape.com/js which requires JavaScript.
+
+name: "Comprehensive Dynamic CSS Test with Proxies"
+description: "Tests dynamic scraping (Selenium) with CSS selectors, pagination, proxy usage, all rule types, and JSON output for quotes.toscrape.com/js/."
+job_type: web
+dynamic: true # Use DynamicScraper
+
+urls:
+  - "http://quotes.toscrape.com/js/" # This version requires JavaScript
+
+# Dynamic Scraper Options
+headless: true
+disable_images: false # Let's test with images enabled for one dynamic case
+page_load_timeout: 45
+webdriver_path: ""
+wait_for_selector: "div.quote" # CSS Selector for an element that appears after JS execution
+wait_time: 5
+
+# No login_config for this specific test
+
+selectors:
+  type: css # Specify selector type for this job
+  item: "div.quote"
+  fields:
+    quote_text: "span.text"
+    author_name: "small.author"
+    # For dynamic scraper, 'attr' is still specified if a specific attribute is needed
+    author_url:
+      selector: "span > a"
+      attr: "href"
+    tags: "div.tags a.tag"
+
+pagination:
+  next_page_selector: "li.next > a" # CSS selector for the 'next page' link
+  max_pages: 2
+
+# --- Proxy Configuration ---
+# IMPORTANT: Replace with your ACTUAL working proxy URLs for this test to be meaningful.
+# If these are dummy/non-working, the scraper will attempt them, fail,
+# and then likely proceed without a proxy (if webdriver init still succeeds).
+proxies:
+  - http: "http://your_proxy_user1:your_proxy_pass1@proxy1.example.com:8000"
+    https: "http://your_proxy_user1:your_proxy_pass1@proxy1.example.com:8000"
+  - http: "http://proxy2.example.com:8080" # Example of a different proxy
+    https: "http://proxy2.example.com:8080"
+  # Add more proxies to test rotation if available
+
+output_format: json
+
+processing_rules:
+  field_types:
+    quote_length: {type: "int"} # Created by transformation
+  text_cleaning:
+    quote_text:
+      trim: true
+      remove_extra_spaces: true
+    author_name:
+      trim: true
+      lowercase: true #Different from other test
+  validations:
+    quote_text: {required: true}
+    # No min_length for this test, but could add
+  transformations:
+    quote_length: "len(item.get('quote_text', ''))"
+    # Add a source URL field
+    scraped_from_url: "item.get('_source_url', 'URL_Not_Captured')" # _source_url is an internal field you could expose
+  drop_fields: [] # No fields dropped in this test
+
+# Common Scraper Options
+request_delay: 1 # Selenium actions are inherently slower, so this is less critical
+max_retries: 2
+user_agent: "Mozilla/5.0 (X11; Linux x86_64) TestRig/1.2 DynamicCSSProxies"
+respect_robots": true

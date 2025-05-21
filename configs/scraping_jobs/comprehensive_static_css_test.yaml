@@ -1,0 +1,70 @@
+# Purpose: Comprehensive test for Static HTML Scraper using CSS selectors.
+# Includes: pagination, all processing rule types, CSV output, no login, no proxies.
+
+name: "Comprehensive Static CSS Test - Quotes"
+description: "Tests static HTML scraping (requests + BeautifulSoup) with CSS selectors, pagination, all rule types, and CSV output for quotes.toscrape.com."
+job_type: web
+dynamic: false # Explicitly use HTMLScraper
+
+urls:
+  - "http://quotes.toscrape.com/"
+
+selectors:
+  type: css # Specify selector type for this job
+  item: "div.quote" # CSS selector for each main item/record
+  fields:
+    # For text content, provide CSS selector to the element. Scraper gets .text
+    quote_text: "span.text"
+    author_name: "small.author"
+    # For attributes, provide CSS selector to element and specify 'attr'
+    author_url:
+      selector: "span > a" # Selects the 'About' link for the author
+      attr: "href"
+    # For multiple similar elements (like tags), CSS selector gets all.
+    # HTMLScraper joins their text.
+    tags: "div.tags a.tag"
+
+pagination:
+  next_page_selector: "li.next > a" # CSS selector for the 'next page' link's <a> tag
+  max_pages: 3 # Limit the number of pages to scrape
+
+# No proxies for this static test
+proxies: []
+
+output_format: csv # Target output format
+
+processing_rules:
+  field_types:
+    quote_text: {type: "string"}
+    author_name: {type: "string"}
+    author_url: {type: "string"}
+    # 'tag_count' will be created by transformations
+  text_cleaning:
+    quote_text:
+      trim: true
+      remove_newlines: false # Keep newlines in quotes for this test
+      regex_replace:
+        '^\s*“|”\s*$': '' # Remove leading/trailing whitespace around curly quotes
+    author_name:
+      trim: true
+      # No case change for this test
+    tags:
+      trim: true # Clean the joined string of tags
+      # Example: replace multiple spaces between tags if joiner was space
+      remove_extra_spaces: true
+  validations:
+    quote_text: {required: true, min_length: 5}
+    author_name: {required: true}
+  transformations:
+    # Create a new field for the number of tags (assuming 'tags' is a string of space-separated tags)
+    tag_count: "len(item.get('tags', '').split()) if item.get('tags') else 0"
+    # Prepend site URL to author_url if it's relative (it is for this site)
+    full_author_url: "f'http://quotes.toscrape.com{item.get(\"author_url\", \"\")}' if item.get(\"author_url\", \"\").startswith('/') else item.get(\"author_url\", \"\")"
+  drop_fields:
+    - "author_url" # Drop the original relative author_url after creating full_author_url
+
+# Common Scraper Options
+request_delay: 0.5 # Be polite
+max_retries: 3
+user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) TestRig/1.2 StaticCSS"
+respect_robots: true

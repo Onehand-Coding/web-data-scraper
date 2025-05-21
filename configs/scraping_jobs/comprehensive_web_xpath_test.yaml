@@ -1,0 +1,110 @@
+# Purpose: Comprehensive test for Dynamic Web Scraper using XPath.
+# Includes: login, pagination, all processing rule types, output_format, and proxy example.
+
+name: "Comprehensive Dynamic XPath Test"
+description: "Tests dynamic scraping (Selenium) with XPath, login, all rule types, pagination, (example) proxies, and SQLite output for quotes.toscrape.com."
+job_type: web # Indicates a web scraping job
+
+# --- Target URLs ---
+# List of initial URLs to scrape.
+# For login-protected sites, this is usually the page(s) to scrape *after* login.
+urls:
+  - "http://quotes.toscrape.com/"
+
+# --- Dynamic Scraper Options (for Selenium) ---
+dynamic: true               # Must be true to use DynamicScraper
+headless: true              # Run browser in headless mode (true for servers, false for visual debugging)
+disable_images: true        # Disable image loading for potentially faster page loads
+page_load_timeout: 40       # Seconds to wait for a page to load before timing out
+webdriver_path: ""          # Optional: Absolute path to your ChromeDriver executable if not in system PATH
+wait_for_selector: "//div[@class='quote']" # XPath: Element to ensure is present on data pages before extraction
+wait_time: 3                # General fixed wait (seconds) after some actions (e.g., page load, login submission)
+
+# --- Login Configuration (for Dynamic Scraper) ---
+login_config:
+  login_url: "http://quotes.toscrape.com/login"             # URL of the login page
+  username_selector: "//input[@id='username']"              # XPath for username field
+  password_selector: "//input[@id='password']"              # XPath for password field
+  submit_selector: "//input[@type='submit' and @value='Login']" # XPath for submit button
+  username: "user"                                          # Dummy username for quotes.toscrape.com
+  password: "password"                                      # Dummy password
+  success_selector: "//a[@href='/logout']"                  # XPath for an element visible after successful login
+  wait_after_login: 3                                       # Seconds to wait after submitting login
+
+# --- Data Extraction Selectors ---
+selectors:
+  type: xpath # Specify selector type for this job
+  item: "//div[@class='quote']" # XPath to select each main item/record
+  fields:
+    # For text content, provide XPath to the element. Scraper gets .text
+    quote_text: ".//span[@class='text']"
+    author_name: ".//small[@class='author']"
+    # For attributes, provide XPath to element and specify 'attr'
+    author_url:
+      selector: ".//small[@class='author']/following-sibling::a"
+      attr: "href"
+    # For multiple similar elements (like tags), this selects all.
+    # The scraper joins their text. Use processing_rules for further refinement.
+    tags: ".//div[@class='tags']/a[@class='tag']"
+
+# --- Pagination Configuration ---
+pagination:
+  # XPath for the 'next page' link. If it's an attribute (like @href),
+  # the DynamicScraper is designed to get the element and then extract this attribute.
+  next_page_selector: "//li[@class='next']/a/@href"
+  max_pages: 2 # Limit the number of pages to scrape
+
+# --- Proxy Configuration (Example) ---
+# To use proxies, uncomment and provide valid proxy URLs.
+# The scraper will rotate through this list.
+proxies: []
+#  - http: "http://your_proxy_user:your_proxy_pass@realproxy1.example.com:8080"
+#    https: "http://your_proxy_user:your_proxy_pass@realproxy1.example.com:8080"
+#  - http: "http://anotherproxy.com:3128" # Example without auth
+
+# --- Output Configuration ---
+output_format: sqlite # Target output format (csv, json, or sqlite)
+
+# --- Data Processing Rules ---
+processing_rules:
+  field_types:
+    # author_name will default to string, no explicit type needed if string is fine
+    quote_text: {type: "string"}
+    author_url: {type: "string"} # For the URL attribute
+    # 'quote_length' will be created by transformations, could define type here if needed post-transform
+  text_cleaning:
+    quote_text:
+      trim: true
+      remove_newlines: true
+      remove_extra_spaces: true
+      regex_replace:
+        '^“|”$': ''      # Remove leading/trailing curly quotes
+        '^"|"$"': ''      # Remove leading/trailing standard quotes
+    author_name:
+      trim: true
+      uppercase: true   # Convert author name to uppercase
+    tags:
+      lowercase: true   # Convert tags to lowercase
+      # Example: If tags were "Tag1, Tag2", and you want to split them,
+      # you might use a transformation rule or handle post-processing.
+      # This text_cleaning applies to the joined string of tags.
+  validations:
+    quote_text: {required: true, min_length: 10}
+    author_name: {required: true}
+    author_url: {required: false, pattern: "^/author/"} # Optional, but if present, must match pattern
+  transformations:
+    # Create a new field with the author's initial
+    author_initial: |
+      item.get('author_name', '')[0] if item.get('author_name') else None
+    # Create a new field for quote length
+    quote_length: "len(item.get('quote_text', ''))"
+    # Example of modifying an existing field (if 'tags' is a string of comma-separated values)
+    # tags_modified: "item.get('tags', '').replace(',', ';')"
+  drop_fields:
+    - "author_url" # Example: Drop this field after transformations are done
+
+# --- Common Scraper Options ---
+request_delay: 1    # Minimum delay in seconds between requests (less critical for Selenium's direct navigation)
+max_retries: 2      # Max retries on failed network requests
+user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) TestRig/1.1 ComprehensiveWeb"
+respect_robots: true # Attempt to respect robots.txt rules
