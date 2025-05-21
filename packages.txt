@@ -1,5 +1,17 @@
-chromium-browser
-chromium-chromedriver
+# Add Google Chrome's official GPG key
+wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+
+# Add Google Chrome's repository to your system's sources list
+sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+
+# Update the package list to include Google's repository
+apt-get update
+
+# Install Google Chrome Stable
+google-chrome-stable
+
+# Install necessary libraries for headless operation (many might be dependencies of chrome already)
+# Keeping a comprehensive list is good for robustness
 libglib2.0-0
 libnss3
 libgconf-2-4
@@ -14,3 +26,5 @@ libatk1.0-0
 libatk-bridge2.0-0
 libcups2
 libgtk-3-0
+libxss1
+libxshmfence1 # Added as sometimes needed
