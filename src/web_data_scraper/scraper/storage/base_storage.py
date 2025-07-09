@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import logging
 
+
 class BaseStorage(ABC):
     """Base class for data storage handlers."""
 
@@ -18,7 +19,7 @@ class BaseStorage(ABC):
 
     def _get_output_dir(self) -> Path:
         """Get or create output directory."""
-        output_dir = Path(self.config.get('output_dir', 'outputs'))
+        output_dir = Path(self.config.get("output_dir", "outputs"))
         output_dir.mkdir(parents=True, exist_ok=True)
         return output_dir
 
@@ -26,5 +27,6 @@ class BaseStorage(ABC):
     def save(self, data: List[Dict], filename: str = None) -> str:
         """Save data to storage."""
         pass
+
 
 # Note: CSVStorage class has been moved to csv_handler.py

@@ -26,7 +26,7 @@ A powerful, flexible Python-based framework for automated web data extraction th
 ### Multiple User Interfaces
 - **🎯 Streamlit Web UI (Primary):** User-friendly interface for creating, managing, and running jobs with real-time feedback
 - **⚡ Command Line Interface:** For automation, scripting, and generating sample configurations
-- **📚 Legacy Flask UI:** Available as reference in `interfaces/flask_ui/`
+- **📚 Legacy Flask UI:** Available as reference in `src/web_data_scraper/interfaces/flask_ui/`
 
 ### Flexible Output Options
 - Save scraped data as CSV, JSON, or SQLite database
@@ -56,36 +56,42 @@ web-data-scraper/
 │   └── scraping_jobs/          # User-defined job configurations (from UI)
 │       └── .gitkeep
 │
-├── interfaces/
-│   ├── cli.py                  # Command Line Interface (using Typer)
-│   ├── streamlit_ui/           # Primary Streamlit Web UI
-│   │   └── app.py
-│   └── flask_ui/               # Legacy Flask Web UI (reference)
-│       └── ...
-│
-├── scraper/                    # Core scraping logic
-│   ├── storage/                # Data storage handlers
-│   │   ├── base_storage.py
-│   │   ├── csv_handler.py
-│   │   ├── json_handler.py
-│   │   └── sqlite_handler.py
-│   ├── utils/                  # Utility modules
-│   │   ├── config_loader.py
-│   │   ├── logger.py
-│   │   └── proxy_rotator.py
-│   ├── api_scraper.py
-│   ├── base_scraper.py
-│   ├── data_processor.py
-│   ├── dynamic_scraper.py
-│   └── html_scraper.py
+├── src/
+│   └── web_data_scraper/       # Main package source code
+│       ├── __init__.py
+│       ├── config.py           # Package configuration
+│       ├── interfaces/         # User interfaces
+│       │   ├── cli.py          # Command Line Interface (using Typer)
+│       │   ├── streamlit_ui/   # Primary Streamlit Web UI
+│       │   │   ├── app.py
+│       │   │   └── launcher.py
+│       │   └── flask_ui/       # Legacy Flask Web UI (reference)
+│       │       └── ...
+│       └── scraper/            # Core scraping logic
+│           ├── storage/        # Data storage handlers
+│           │   ├── base_storage.py
+│           │   ├── csv_handler.py
+│           │   ├── json_handler.py
+│           │   └── sqlite_handler.py
+│           ├── utils/          # Utility modules
+│           │   ├── config_loader.py
+│           │   ├── logger.py
+│           │   ├── proxy_rotator.py
+│           │   └── user_agents.py
+│           ├── api_scraper.py
+│           ├── base_scraper.py
+│           ├── data_processor.py
+│           ├── dynamic_scraper.py
+│           └── html_scraper.py
 │
 ├── logs/                       # Log files (Git ignored)
 ├── outputs/                    # Scraped data output (Git ignored)
 ├── tests/                      # Test directory
 ├── .gitignore
 ├── packages.txt                # System dependencies for Streamlit Cloud
+├── pyproject.toml              # Modern Python project configuration
 ├── README.md
-└── requirements.txt
+└── uv.lock                     # UV dependency lock file
 ```
 
 ## 🛠️ Setup and Installation
@@ -93,7 +99,7 @@ web-data-scraper/
 ### Prerequisites
 
 - Python 3.9+
-- `pip` (Python package installer)
+- `uv` (recommended) or `pip` (Python package installer)
 - `git` (for cloning the repository)
 - **For Dynamic Scraping:** Google Chrome/Chromium browser
 
@@ -105,23 +111,17 @@ web-data-scraper/
    cd web-data-scraper
    ```
 
-2. **Create and activate a virtual environment (recommended):**
+2. **Install dependencies using UV (recommended):**
    ```bash
-   python -m venv .venv
-
-   # On Linux/macOS:
-   source .venv/bin/activate
-
-   # On Windows:
-   .venv\Scripts\activate
+   uv sync
    ```
 
-3. **Install Python dependencies:**
+   **Or using pip:**
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **WebDriver Setup (for Dynamic Scraping):**
+3. **WebDriver Setup (for Dynamic Scraping):**
 
    **Option A - Automatic (Recommended):**
    - Leave `webdriver_path` blank in your job configurations
@@ -139,7 +139,11 @@ The Streamlit Web UI provides the most comprehensive and user-friendly experienc
 
 1. **Start the application:**
    ```bash
-   streamlit run interfaces/streamlit_ui/app.py
+   # Using UV (recommended)
+   uv run web-scraper-web
+
+   # Or using the module directly
+   uv run streamlit run src/web_data_scraper/interfaces/streamlit_ui/app.py
    ```
 
 2. **Access the UI** at `http://localhost:8501`
@@ -162,22 +166,30 @@ Perfect for automation and scripting workflows.
 
 1. **Run a scraping job:**
    ```bash
-   python -m interfaces.cli run path/to/config.yaml --format [csv|json|sqlite]
+   # Using UV (recommended)
+   uv run web-scraper-cli run path/to/config.yaml
+
+   # Or using the module directly
+   uv run python -m web_data_scraper.interfaces.cli run path/to/config.yaml
    ```
 
    **Example:**
    ```bash
-   python -m interfaces.cli run configs/example_templates/comprehensive_static_css_test.yaml --format csv
+   uv run web-scraper-cli run configs/example_templates/comprehensive_static_css_test.yaml
    ```
 
 2. **Generate sample configurations:**
    ```bash
    # Creates basic templates in configs/generated_samples/
-   python -m interfaces.cli generate-config
+   uv run web-scraper-cli generate-config
 
    # Create with custom base name
-   python -m interfaces.cli generate-config my_custom_samples
+   uv run web-scraper-cli generate-config my_custom_samples
    ```
+
+3. **Available CLI commands:**
+   - `run` - Execute a scraping job from a YAML configuration
+   - `generate-config` - Generate sample configuration files
 
 ## ⚙️ Configuration Guide
 
@@ -442,4 +454,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-**Ready to start scraping?** Launch the Streamlit UI and explore the example jobs to see the framework in action!
+**Ready to start scraping?** Launch the Streamlit UI with `uv run web-scraper-web` and explore the example jobs to see the framework in action!

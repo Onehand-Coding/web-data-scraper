@@ -9,6 +9,7 @@ from requests.exceptions import ProxyError
 import logging
 from urllib.parse import urlparse
 
+
 class ProxyRotator:
     """Manages rotation of proxy servers for requests."""
 
@@ -34,8 +35,7 @@ class ProxyRotator:
             return None
 
         available_proxies = [
-            p for p in self.proxies
-            if self._proxy_key(p) not in self.bad_proxies
+            p for p in self.proxies if self._proxy_key(p) not in self.bad_proxies
         ]
 
         if not available_proxies:
@@ -51,14 +51,10 @@ class ProxyRotator:
         self.bad_proxies.add(proxy_key)
         self.logger.warning(f"Marked proxy as bad: {proxy_key}")
 
-    def test_proxy(self, proxy: Dict, test_url: str = 'https://www.google.com') -> bool:
+    def test_proxy(self, proxy: Dict, test_url: str = "https://www.google.com") -> bool:
         """Test if a proxy is working."""
         try:
-            response = requests.get(
-                test_url,
-                proxies=proxy,
-                timeout=10
-            )
+            response = requests.get(test_url, proxies=proxy, timeout=10)
             return response.status_code == 200
         except (ProxyError, requests.RequestException) as e:
             self.logger.debug(f"Proxy test failed: {e}")
@@ -66,9 +62,9 @@ class ProxyRotator:
 
     def _proxy_key(self, proxy: Dict) -> str:
         """Get unique key for a proxy configuration."""
-        http_proxy = proxy.get('http', '')
+        http_proxy = proxy.get("http", "")
         if not http_proxy:
-            return ''
+            return ""
         parsed = urlparse(http_proxy)
         return f"{parsed.hostname}:{parsed.port}"
 
