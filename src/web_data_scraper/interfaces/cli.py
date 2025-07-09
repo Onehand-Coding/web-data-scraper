@@ -5,8 +5,10 @@ import typer
 import logging
 from pathlib import Path
 from typing import Optional, List
+
 from jsonschema import ValidationError
 
+from web_data_scraper.config import ROOT_DIR
 from web_data_scraper.scraper.api_scraper import APIScraper
 from web_data_scraper.scraper.html_scraper import HTMLScraper
 from web_data_scraper.scraper.dynamic_scraper import DynamicScraper
@@ -15,6 +17,8 @@ from web_data_scraper.scraper.storage.json_handler import JSONStorage
 from web_data_scraper.scraper.storage.sqlite_handler import SQLiteStorage
 from web_data_scraper.scraper.utils.logger import setup_logging
 from web_data_scraper.scraper.utils.config_loader import ConfigLoader
+
+LOG_FILE = ROOT_DIR / "logs" / "cli_scraper.log"
 
 app = typer.Typer(help="Web Scraper Framework")
 config_loader_cli_instance = ConfigLoader()
@@ -46,7 +50,7 @@ def run_scraper(
 ):
     """Run scraping job based on configuration file."""
     setup_logging(
-        log_filename="cli_scraper.log", level=logging.INFO, console_level=logging.INFO
+        log_filename=LOG_FILE, level=logging.INFO, console_level=logging.INFO
     )
 
     try:

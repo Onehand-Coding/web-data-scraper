@@ -1,16 +1,15 @@
 """
 Logging configuration and utilities.
 """
-
-import logging
-from logging.handlers import RotatingFileHandler
-from pathlib import Path
 import sys
+import logging
+from pathlib import Path
 from typing import Optional
+from logging.handlers import RotatingFileHandler
 
-# --- Define Logs Directory relative to this file's parent's parent (project root) ---
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-LOGS_DIR = PROJECT_ROOT / "logs"
+from web_data_scaper.config import ROOT_DIR
+
+LOGS_DIR = ROOT_DIR / "logs"
 
 
 def setup_logging(
