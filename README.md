@@ -86,7 +86,8 @@ web-data-scraper/
 │
 ├── logs/                       # Log files (Git ignored)
 ├── outputs/                    # Scraped data output (Git ignored)
-├── tests/                      # Test directory
+├── tests/
+│   └── ...                     # Tests directory
 ├── .gitignore
 ├── packages.txt                # System dependencies for Streamlit Cloud
 ├── pyproject.toml              # Modern Python project configuration
@@ -94,7 +95,10 @@ web-data-scraper/
 └── uv.lock                     # UV dependency lock file
 ```
 
-## 🛠️ Setup and Installation
+
+---
+
+## 🛠️ Setup, Development & Testing
 
 ### Prerequisites
 
@@ -130,6 +134,30 @@ web-data-scraper/
    **Option B - Manual:**
    - Download ChromeDriver matching your Chrome version: [ChromeDriver Downloads](https://chromedriver.chromium.org/downloads)
    - Add ChromeDriver to your system PATH or specify the absolute path in `webdriver_path` field
+
+### Development & Testing
+
+- **Run tests:**
+  ```bash
+  uv run pytest
+  ```
+
+- **Lint your code:**
+  ```bash
+  ruff check src/
+  ```
+
+- **Modern packaging:**
+  This project uses a `src/` layout and is configured with `pyproject.toml` using [hatchling](https://hatch.pypa.io/latest/).
+
+---
+
+### 📝 src/ Layout
+
+All source code is under `src/web_data_scraper/` for best practices in modern Python packaging.
+This prevents import issues and accidental shadowing during development and testing.
+
+---
 
 ## 🖥️ Using the Application
 

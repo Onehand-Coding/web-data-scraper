@@ -1,9 +1,11 @@
 import time
-import requests  # Used indirectly via BaseScraper's session
-from typing import Dict, List, Optional, Any
-from .base_scraper import BaseScraper
-import json  # For parsing JSON responses
+import json
 import logging
+from typing import Dict, List, Optional, Any
+
+import requests  # Used indirectly via BaseScraper's session
+
+from .base_scraper import BaseScraper
 
 
 # --- Helper function for nested access ---

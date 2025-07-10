@@ -1,8 +1,9 @@
-from typing import Dict, List, Any, Optional
+#!/usr/bin/env python3
 import re
-from datetime import datetime, date
+import json
 import logging
-import json  # Keep import although only used in _convert_type currently
+from typing import Dict, List, Any, Optional
+from datetime import datetime, date
 
 
 # Helper function for nested access (if not imported from a shared utils module)

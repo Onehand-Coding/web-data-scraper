@@ -1,13 +1,11 @@
-"""
-Logging configuration and utilities.
-"""
+#!/usr/bin/env python3
 import sys
 import logging
 from pathlib import Path
 from typing import Optional
 from logging.handlers import RotatingFileHandler
 
-from web_data_scaper.config import ROOT_DIR
+from web_data_scraper.config import ROOT_DIR
 
 LOGS_DIR = ROOT_DIR / "logs"
 

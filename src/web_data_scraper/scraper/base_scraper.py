@@ -1,19 +1,21 @@
-from abc import ABC, abstractmethod
-import logging
-from typing import Dict, List, Optional, Any, Set
-from urllib.robotparser import RobotFileParser
-from urllib.parse import urlparse, urljoin
+#!/usr/bin/env python3
 import time
+import logging
+from abc import ABC, abstractmethod
+from urllib.parse import urlparse, urljoin
+from urllib.robotparser import RobotFileParser
+from typing import Dict, List, Optional, Any, Set
+
 import requests
 from requests.exceptions import ProxyError, Timeout, HTTPError, RequestException
 from bs4 import (
     BeautifulSoup,
-)  # Keep for potential future use in base class, though not used directly now
+)
+
 from .data_processor import DataProcessor
 from .utils.proxy_rotator import ProxyRotator
 
 
-# Helper function moved inside or kept separate as preferred
 def _proxy_to_str(proxy_dict: Optional[Dict]) -> str:
     """Helper to get a display string for a proxy dict."""
     if not proxy_dict:
