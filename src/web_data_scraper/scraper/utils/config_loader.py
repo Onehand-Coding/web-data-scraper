@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import yaml
 import logging
 from pathlib import Path
@@ -494,7 +495,6 @@ class ConfigLoader:
         # --- Sample Web Config ---
         sample_config_web = {
             "name": "Sample Dynamic Web Job",
-            # ... (rest of your sample_config_web definition, ensure it's complete and up-to-date) ...
             "description": "Example config for scraping a dynamic website, possibly requiring login.",
             "job_type": "web",
             "urls": ["http://quotes.toscrape.com/js/"],
@@ -528,7 +528,6 @@ class ConfigLoader:
         # --- Sample API Config ---
         api_sample = {
             "name": "Sample API Job - JSONPlaceholder",
-            # ... (rest of your api_sample definition, ensure it's complete and up-to-date) ...
             "job_type": "api",
             "api_config": {
                 "base_url": "https://jsonplaceholder.typicode.com",

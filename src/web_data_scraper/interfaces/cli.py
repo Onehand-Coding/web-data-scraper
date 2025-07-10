@@ -49,9 +49,7 @@ def run_scraper(
     ),
 ):
     """Run scraping job based on configuration file."""
-    setup_logging(
-        log_filename=LOG_FILE, level=logging.INFO, console_level=logging.INFO
-    )
+    setup_logging(log_filename=LOG_FILE, level=logging.INFO, console_level=logging.INFO)
 
     try:
         config = config_loader_cli_instance.load_config(str(config_file))

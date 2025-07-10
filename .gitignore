@@ -6,3 +6,5 @@ __pycache__/
 configs/scraping_jobs/
 *.env
 *.sublime-*
+.ruff_cache/
+.pytest_cache/

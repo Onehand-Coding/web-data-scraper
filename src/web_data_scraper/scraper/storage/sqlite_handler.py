@@ -81,18 +81,16 @@ class SQLiteStorage(BaseStorage):
 
             # Insert data
             # Use dict keys for column names for robustness
-            columns = [
-                '"{}"'.format(k) for k in sample_item.keys()
-            ]  # Quote column names
+            data_columns = [k for k in sample_item.keys() if k != "id"]
+            columns = ['"{}"'.format(k) for k in data_columns]
             placeholders = ", ".join(["?"] * len(columns))
             insert_sql = f'INSERT INTO "{self.table_name}" ({", ".join(columns)}) VALUES ({placeholders})'
 
             # Prepare data for executemany
             data_to_insert = []
             for item in data:
-                # Ensure item has all keys from sample_item, filling missing with None
                 row_values = [
-                    self._prepare_value(item.get(key)) for key in sample_item.keys()
+                    self._prepare_value(item.get(key)) for key in data_columns
                 ]
                 data_to_insert.append(tuple(row_values))
 
@@ -118,6 +116,8 @@ class SQLiteStorage(BaseStorage):
         """Generate SQL column definitions (name and type) from data sample."""
         columns = []
         for field, value in sample_item.items():
+            if field == "id":  # Skip user-provided id field
+                continue
             sql_type = self._sql_type_for_value(value)
             # Quote field names to handle keywords or special characters
             columns.append(f'"{field}" {sql_type}')

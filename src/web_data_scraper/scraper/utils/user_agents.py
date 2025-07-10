@@ -1,9 +1,6 @@
-"""
-User agent string management and rotation.
-"""
-
-from typing import List
+#!/usr/bin/env python
 import random
+from typing import List, Dict
 
 # Common user agents for different browsers and devices
 USER_AGENTS = {
