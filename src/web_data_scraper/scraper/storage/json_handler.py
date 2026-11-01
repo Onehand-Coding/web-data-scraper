@@ -1,15 +1,13 @@
-import time
 import json
-from pathlib import Path
-from typing import List, Dict
+import time
+
 from .base_storage import BaseStorage
-import logging
 
 
 class JSONStorage(BaseStorage):
     """JSON file storage handler."""
 
-    def save(self, data: List[Dict], filename: str = None) -> str:
+    def save(self, data: list[dict], filename: str = None) -> str:
         """Save data to JSON file."""
         if not filename:
             # Generate filename based on job name if available, else timestamp

@@ -1,10 +1,11 @@
+import os
+from pathlib import Path
+from unittest.mock import patch
+
 import pytest
 import yaml
+
 from web_data_scraper.scraper.utils.config_loader import ConfigLoader, ValidationError
-from pathlib import Path
-from unittest.mock import MagicMock, patch
-import tempfile
-import os
 
 
 @pytest.fixture
@@ -116,13 +117,13 @@ def test_generate_sample_config(tmp_path, mocker):
     assert expected_api_path.exists()
 
     # Verify content is valid YAML
-    with open(expected_web_path, "r", encoding="utf-8") as f:
+    with open(expected_web_path, encoding="utf-8") as f:
         web_config = yaml.safe_load(f)
         assert web_config["name"] == "Sample Dynamic Web Job"
         assert web_config["job_type"] == "web"
         assert web_config["dynamic"] is True
 
-    with open(expected_api_path, "r", encoding="utf-8") as f:
+    with open(expected_api_path, encoding="utf-8") as f:
         api_config = yaml.safe_load(f)
         assert api_config["name"] == "Sample API Job - JSONPlaceholder"
         assert api_config["job_type"] == "api"

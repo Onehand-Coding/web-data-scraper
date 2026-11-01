@@ -1,9 +1,7 @@
-import time
 import json
 import logging
-from typing import Dict, List, Optional, Any
-
-import requests  # Used indirectly via BaseScraper's session
+import time
+from typing import Any
 
 from .base_scraper import BaseScraper
 
@@ -11,7 +9,7 @@ from .base_scraper import BaseScraper
 # --- Helper function for nested access ---
 # Consider moving to a shared utils module if used elsewhere
 def get_nested_value(
-    data_dict: Optional[Dict | List], key_path: str, default: Any = None
+    data_dict: dict | list | None, key_path: str, default: Any = None
 ) -> Any:
     """
     Accesses a value in a nested structure (dict or list) using a dot-separated key path.
@@ -92,7 +90,7 @@ class APIScraper(BaseScraper):
     JSON parsing, data path navigation, and field mapping.
     """
 
-    def __init__(self, config: Dict):
+    def __init__(self, config: dict):
         """
         Initializes the APIScraper.
 
@@ -112,7 +110,7 @@ class APIScraper(BaseScraper):
             # Consider raising an error here if api_config is absolutely mandatory
             # raise ValueError("Missing required 'api_config' section for APIScraper")
 
-    def fetch_data(self, endpoint: str, params: Optional[Dict] = None) -> Optional[Any]:
+    def fetch_data(self, endpoint: str, params: dict | None = None) -> Any | None:
         """
         Fetches data from a specific API endpoint relative to the base URL.
 
@@ -138,25 +136,26 @@ class APIScraper(BaseScraper):
         # Construct the full URL, ensuring no double slashes
         full_url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
 
-        # --- Note: Current implementation relies on BaseScraper.fetch_page ---
-        # This means it primarily supports GET requests.
-        # For POST/PUT/PATCH/DELETE, the session method in fetch_page would need
-        # modification or direct session usage here (e.g., self.session.post(...)).
         http_method = self.api_config.get("method", "GET").upper()
-        if http_method != "GET":
-            self.logger.warning(
-                f"APIScraper currently uses BaseScraper.fetch_page which performs GET requests. Configured method '{http_method}' will be ignored for fetching."
-            )
-            # TODO: Enhance BaseScraper.fetch_page or implement specific POST/PUT etc. logic here if needed.
-            # request_data = self.api_config.get('data') # Prepare data for non-GET
-            # response = self.session.request(method=http_method, url=full_url, ...)
+        request_params = dict(self.api_config.get("params", {}))
+        if params:
+            request_params.update(params)
+        request_headers = self.api_config.get("headers", {})
+        request_body = self.api_config.get("data")
+        json_body = request_body if isinstance(request_body, dict) else None
+        data_body = request_body if isinstance(request_body, str) else None
 
-        # --- Use BaseScraper's fetch_page for GET request handling ---
-        # It incorporates session (headers, proxies), throttling, retries.
-        # It fetches the raw text content of the response.
-        response_text = super().fetch_page(
-            full_url
-        )  # BaseScraper handles logging fetch attempt
+        if http_method == "GET" and not request_params and not request_headers:
+            response_text = super().fetch_page(full_url)
+        else:
+            response_text = super().fetch_page(
+                full_url,
+                method=http_method,
+                params=request_params or None,
+                headers=request_headers or None,
+                json_body=json_body,
+                data_body=data_body,
+            )
 
         if response_text:
             # If text content was received, attempt to parse it as JSON
@@ -176,7 +175,7 @@ class APIScraper(BaseScraper):
             # Error is already logged by fetch_page
             return None
 
-    def extract_data(self, response_data: Any, url: str = "N/A") -> List[Dict]:
+    def extract_data(self, response_data: Any, url: str = "N/A") -> list[dict]:
         """
         Extracts a list of item dictionaries from the parsed API response data.
 
@@ -190,8 +189,8 @@ class APIScraper(BaseScraper):
         Returns:
             A list of dictionaries, where each dictionary represents a processed item.
         """
-        items_list: List = []  # The list of raw items found at data_path
-        processed_items: List[Dict] = []  # The final list with mappings applied
+        items_list: list = []  # The list of raw items found at data_path
+        processed_items: list[dict] = []  # The final list with mappings applied
 
         if response_data is None:  # Handle case where fetch_data returned None
             self.logger.warning(
@@ -274,7 +273,7 @@ class APIScraper(BaseScraper):
             )
             return []
 
-    def run(self) -> Dict:
+    def run(self) -> dict:
         """
         Executes the API scraping job for all configured endpoints.
 
@@ -287,7 +286,7 @@ class APIScraper(BaseScraper):
             and the original configuration ('config').
         """
         self.stats["start_time"] = time.time()  # Record job start
-        all_extracted_data: List[Dict] = []
+        all_extracted_data: list[dict] = []
         endpoints = self.api_config.get("endpoints", [])
 
         if not endpoints:

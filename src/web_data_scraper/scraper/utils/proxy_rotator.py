@@ -2,18 +2,18 @@
 Proxy rotation and management utilities.
 """
 
+import logging
 import random
-from typing import List, Dict, Optional
+from urllib.parse import urlparse
+
 import requests
 from requests.exceptions import ProxyError
-import logging
-from urllib.parse import urlparse
 
 
 class ProxyRotator:
     """Manages rotation of proxy servers for requests."""
 
-    def __init__(self, proxies: List[Dict] = None):
+    def __init__(self, proxies: list[dict] = None):
         """
         Initialize with list of proxy configurations.
 
@@ -29,7 +29,7 @@ class ProxyRotator:
         self.bad_proxies = set()
         self.logger = logging.getLogger(__name__)
 
-    def get_proxy(self) -> Optional[Dict]:
+    def get_proxy(self) -> dict | None:
         """Get a random working proxy."""
         if not self.proxies:
             return None
@@ -45,13 +45,13 @@ class ProxyRotator:
         self.current_proxy = random.choice(available_proxies)
         return self.current_proxy
 
-    def mark_bad(self, proxy: Dict) -> None:
+    def mark_bad(self, proxy: dict) -> None:
         """Mark a proxy as bad (failed)."""
         proxy_key = self._proxy_key(proxy)
         self.bad_proxies.add(proxy_key)
         self.logger.warning(f"Marked proxy as bad: {proxy_key}")
 
-    def test_proxy(self, proxy: Dict, test_url: str = "https://www.google.com") -> bool:
+    def test_proxy(self, proxy: dict, test_url: str = "https://www.google.com") -> bool:
         """Test if a proxy is working."""
         try:
             response = requests.get(test_url, proxies=proxy, timeout=10)
@@ -60,7 +60,7 @@ class ProxyRotator:
             self.logger.debug(f"Proxy test failed: {e}")
             return False
 
-    def _proxy_key(self, proxy: Dict) -> str:
+    def _proxy_key(self, proxy: dict) -> str:
         """Get unique key for a proxy configuration."""
         http_proxy = proxy.get("http", "")
         if not http_proxy:
@@ -68,6 +68,6 @@ class ProxyRotator:
         parsed = urlparse(http_proxy)
         return f"{parsed.hostname}:{parsed.port}"
 
-    def rotate(self) -> Optional[Dict]:
+    def rotate(self) -> dict | None:
         """Rotate to next available proxy."""
         return self.get_proxy()

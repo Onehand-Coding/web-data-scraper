@@ -1,5 +1,7 @@
 # Web Data Scraper Framework
 
+[![CI](https://github.com/Onehand-Coding/web-data-scraper/actions/workflows/ci.yml/badge.svg)](https://github.com/Onehand-Coding/web-data-scraper/actions/workflows/ci.yml)
+
 A powerful, flexible Python-based framework for automated web data extraction that supports scraping static HTML pages, dynamic JavaScript-rendered websites, and direct API integration.
 
 ## 🚀 Key Features
@@ -7,7 +9,7 @@ A powerful, flexible Python-based framework for automated web data extraction th
 ### Multiple Scraping Strategies
 - **HTML Scraper:** For static websites using `requests` + `BeautifulSoup4`
 - **Dynamic Scraper:** For JavaScript-heavy sites using Selenium WebDriver
-- **API Scraper:** For direct interaction with JSON-based web APIs
+- **API Scraper:** For direct interaction with JSON-based web APIs, including GET, POST, PUT, PATCH, and DELETE with params, headers, and request bodies
 
 ### Highly Configurable via YAML
 - Define complete scraping jobs in simple, human-readable YAML files
@@ -107,11 +109,22 @@ web-data-scraper/
 - `git` (for cloning the repository)
 - **For Dynamic Scraping:** Google Chrome/Chromium browser
 
+### Tests and CI
+
+```bash
+uv sync --extra dev
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest
+```
+
+CI runs the same checks plus a wheel build.
+
 ### Installation Steps
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/web-data-scraper.git
+   git clone https://github.com/Onehand-Coding/web-data-scraper.git
    cd web-data-scraper
    ```
 

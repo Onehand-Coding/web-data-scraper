@@ -1,6 +1,8 @@
+from datetime import date  # <-- fix here
+
 import pytest
+
 from web_data_scraper.scraper.data_processor import DataProcessor
-from datetime import datetime, date  # <-- fix here
 
 
 @pytest.fixture

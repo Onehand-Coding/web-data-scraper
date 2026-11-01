@@ -1,11 +1,13 @@
+import json
+import sqlite3
+from pathlib import Path
+
+import pandas as pd
 import pytest
+
 from web_data_scraper.scraper.storage.csv_handler import CSVStorage
 from web_data_scraper.scraper.storage.json_handler import JSONStorage
 from web_data_scraper.scraper.storage.sqlite_handler import SQLiteStorage
-from pathlib import Path
-import pandas as pd
-import sqlite3
-import json
 
 
 @pytest.fixture
@@ -44,7 +46,7 @@ def test_json_storage_save(storage_config, tmp_path):
     storage = JSONStorage(storage_config)
     filepath = storage.save(data, "test.json")
     assert Path(filepath).exists()
-    with open(filepath, "r") as f:
+    with open(filepath) as f:
         saved_data = json.load(f)
     assert saved_data == data
 

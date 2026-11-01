@@ -2,31 +2,31 @@
 # - Corrected extract_data to expect XPath selectors to point to elements.
 # - Selenium's .text or .get_attribute() will be used on found WebElements.
 
-from typing import Dict, List, Optional, Any, Set
-from urllib.parse import urljoin, urlparse
-import time
 import logging
+import os
+import time
+from typing import Any
+from urllib.parse import urljoin, urlparse
 
 # Selenium Imports
 from selenium import webdriver
-from selenium.webdriver.remote.webdriver import WebDriver
-from selenium.webdriver.remote.webelement import WebElement
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import (
-    WebDriverException,
-    TimeoutException,
-    NoSuchElementException,
     ElementNotInteractableException,
     InvalidSelectorException,
-    ElementClickInterceptedException,
+    NoSuchElementException,
+    TimeoutException,
+    WebDriverException,
 )
+from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.remote.webelement import WebElement
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 from .base_scraper import BaseScraper
 
 
-def _proxy_to_str(proxy_dict: Optional[Dict]) -> str:
+def _proxy_to_str(proxy_dict: dict | None) -> str:
     if not proxy_dict:
         return "None"
     url = proxy_dict.get("https", proxy_dict.get("http", "N/A"))
@@ -34,26 +34,26 @@ def _proxy_to_str(proxy_dict: Optional[Dict]) -> str:
 
 
 class DynamicScraper(BaseScraper):
-    def __init__(self, config: Dict):
+    def __init__(self, config: dict):
         super().__init__(config)
-        self.driver: Optional[WebDriver] = None
-        self.selectors: Dict = config.get("selectors", {})
+        self.driver: WebDriver | None = None
+        self.selectors: dict = config.get("selectors", {})
         self.selector_type: str = self.selectors.get("type", "css").lower()
-        self.pagination_config: Optional[Dict] = config.get("pagination")
-        self.login_config: Optional[Dict] = config.get("login_config")
+        self.pagination_config: dict | None = config.get("pagination")
+        self.login_config: dict | None = config.get("login_config")
         self.logger.info(
             f"DynamicScraper initialized (Selector Type: {self.selector_type.upper()})"
         )
 
-    def _init_driver(self) -> Optional[WebDriver]:
+    def _init_driver(self) -> WebDriver | None:
         if self.driver:
             self.logger.warning(
                 "WebDriver already initialized. Returning existing instance."
             )
             return self.driver
 
-        current_proxy_config: Optional[Dict] = None
-        proxy_arg: Optional[str] = None
+        current_proxy_config: dict | None = None
+        proxy_arg: str | None = None
         proxy_display_str: str = "None"
 
         if self.proxy_rotator:
@@ -105,7 +105,7 @@ class DynamicScraper(BaseScraper):
 
         try:
             self.logger.info("Initializing WebDriver...")
-            driver: Optional[WebDriver] = None
+            driver: WebDriver | None = None
             if driver_path and os.path.exists(driver_path):
                 from selenium.webdriver.chrome.service import Service
 
@@ -307,7 +307,7 @@ class DynamicScraper(BaseScraper):
             return False
 
     def _wait_for_page_load(
-        self, current_url: Optional[str] = None, use_config_selector: bool = True
+        self, current_url: str | None = None, use_config_selector: bool = True
     ):
         if not self.driver:
             return
@@ -354,7 +354,7 @@ class DynamicScraper(BaseScraper):
             )
             self.logger.error(f"Error during explicit wait on {context_url}: {e}")
 
-    def extract_data(self, url: str) -> List[Dict]:
+    def extract_data(self, url: str) -> list[dict]:
         items = []
         if not self.driver:
             self.logger.error("WebDriver not available for extraction.")
@@ -395,7 +395,7 @@ class DynamicScraper(BaseScraper):
             self.logger.debug(
                 f"Looking for item elements using {self.selector_type.upper()}: '{item_selector}'"
             )
-            elements: List[WebElement] = []
+            elements: list[WebElement] = []
             try:
                 if isinstance(search_context, WebDriver):
                     WebDriverWait(search_context, 5).until(
@@ -425,9 +425,9 @@ class DynamicScraper(BaseScraper):
             for i, element_selenium in enumerate(elements):
                 item_data = {}
                 for field, selector_config in field_selectors.items():
-                    value: Optional[str] = None
-                    current_field_selector: Optional[str] = None
-                    attr: Optional[str] = None
+                    value: str | None = None
+                    current_field_selector: str | None = None
+                    attr: str | None = None
 
                     if isinstance(selector_config, str):
                         current_field_selector = selector_config
@@ -537,7 +537,6 @@ class DynamicScraper(BaseScraper):
 
         try:
             element_selector_for_click = next_page_selector
-            attribute_for_href = "href"  # Default for <a> tags
 
             if self.selector_type == "xpath" and "/@" in next_page_selector:
                 # If XPath targets an attribute (e.g., //a/@href), we need the element part for clicking
@@ -569,7 +568,7 @@ class DynamicScraper(BaseScraper):
                 )
                 return False
 
-            self.logger.info(f"Found clickable 'Next' page element. Clicking...")
+            self.logger.info("Found clickable 'Next' page element. Clicking...")
             self.driver.execute_script(
                 "arguments[0].scrollIntoView(true);", next_button
             )
@@ -595,9 +594,9 @@ class DynamicScraper(BaseScraper):
             )
         return False
 
-    def run(self) -> Dict:
+    def run(self) -> dict:
         self.stats["start_time"] = time.time()
-        all_extracted_data: List[Dict] = []
+        all_extracted_data: list[dict] = []
         initial_urls = self.config.get("urls", [])
         if isinstance(initial_urls, str):
             initial_urls = [initial_urls]
@@ -640,7 +639,7 @@ class DynamicScraper(BaseScraper):
                 self.stats["end_time"] = time.time()
                 return {"data": [], "stats": self.get_stats(), "config": self.config}
 
-            scraped_urls: Set[str] = set()
+            scraped_urls: set[str] = set()
             max_pages = float("inf")
             if self.pagination_config:
                 max_pages_val = self.pagination_config.get("max_pages")

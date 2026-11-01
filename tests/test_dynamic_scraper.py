@@ -1,6 +1,8 @@
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 from selenium.webdriver.remote.webdriver import WebDriver
+
 from web_data_scraper.scraper.dynamic_scraper import DynamicScraper
 
 

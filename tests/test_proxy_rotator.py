@@ -1,4 +1,3 @@
-import pytest
 from web_data_scraper.scraper.utils.proxy_rotator import ProxyRotator
 
 

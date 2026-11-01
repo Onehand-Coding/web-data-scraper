@@ -1,5 +1,7 @@
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, patch
+
 from web_data_scraper.scraper.base_scraper import BaseScraper
 
 

@@ -3,17 +3,16 @@ SQLite storage implementation.
 """
 
 import sqlite3
-from pathlib import Path
-from typing import List, Dict, Any  # Added Any import back for _sql_type_for_value
+from datetime import date, datetime  # Added date import back
+from typing import Any  # Added Any import back for _sql_type_for_value
+
 from .base_storage import BaseStorage
-import logging
-from datetime import datetime, date  # Added date import back
 
 
 class SQLiteStorage(BaseStorage):
     """SQLite database storage handler."""
 
-    def __init__(self, config: Dict):
+    def __init__(self, config: dict):
         super().__init__(config)
         # Use job name for db name if available, sanitize it
         job_name = config.get("name", "scraped_data").replace(" ", "_").lower()
@@ -29,7 +28,7 @@ class SQLiteStorage(BaseStorage):
             c if c.isalnum() or c == "_" else "_" for c in table_name_base
         )
 
-    def save(self, data: List[Dict], filename: str = None) -> str:
+    def save(self, data: list[dict], filename: str = None) -> str:
         """Save data to SQLite database. Filename argument is ignored."""
         if not data:
             self.logger.warning("No data provided to save to SQLite.")
@@ -82,7 +81,7 @@ class SQLiteStorage(BaseStorage):
             # Insert data
             # Use dict keys for column names for robustness
             data_columns = [k for k in sample_item.keys() if k != "id"]
-            columns = ['"{}"'.format(k) for k in data_columns]
+            columns = [f'"{k}"' for k in data_columns]
             placeholders = ", ".join(["?"] * len(columns))
             insert_sql = f'INSERT INTO "{self.table_name}" ({", ".join(columns)}) VALUES ({placeholders})'
 
@@ -112,7 +111,7 @@ class SQLiteStorage(BaseStorage):
             if conn:
                 conn.close()
 
-    def _generate_column_definitions(self, sample_item: Dict) -> str:
+    def _generate_column_definitions(self, sample_item: dict) -> str:
         """Generate SQL column definitions (name and type) from data sample."""
         columns = []
         for field, value in sample_item.items():
