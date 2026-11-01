@@ -1,35 +1,35 @@
+import json
+import logging
+import os
+import re
+import time
+from datetime import datetime
+from pathlib import Path
+
+import yaml
 from flask import (
     Flask,
+    abort,
+    flash,
+    redirect,
     render_template,
     request,
-    jsonify,
-    redirect,
     url_for,
-    flash,
-    abort,
 )
-from pathlib import Path
-import yaml
-import json
-import time
-import os
-import logging
-import re
-from werkzeug.utils import secure_filename
-from datetime import datetime
-
-# Scraper and utils imports
-from scraper.api_scraper import APIScraper
-from scraper.html_scraper import HTMLScraper
-from scraper.dynamic_scraper import DynamicScraper
-from scraper.storage.csv_handler import CSVStorage
-from scraper.storage.json_handler import JSONStorage
-from scraper.storage.sqlite_handler import SQLiteStorage
-from scraper.utils.logger import setup_logging
-from scraper.utils.config_loader import ConfigLoader
 from jsonschema import (
     ValidationError as JsonSchemaValidationError,
 )  # Alias to avoid name clash
+
+# Scraper and utils imports
+from scraper.api_scraper import APIScraper
+from scraper.dynamic_scraper import DynamicScraper
+from scraper.html_scraper import HTMLScraper
+from scraper.storage.csv_handler import CSVStorage
+from scraper.storage.json_handler import JSONStorage
+from scraper.storage.sqlite_handler import SQLiteStorage
+from scraper.utils.config_loader import ConfigLoader
+from scraper.utils.logger import setup_logging
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.secret_key = os.environ.get(
@@ -55,7 +55,7 @@ def timestamp_to_datetime_filter(s):
     """Jinja filter to convert Unix timestamp to readable datetime string."""
     try:
         return datetime.fromtimestamp(float(s)).strftime("%Y-%m-%d %H:%M:%S")
-    except:
+    except Exception:
         return "N/A"
 
 
@@ -100,7 +100,7 @@ def parse_processing_rules(form):
                 else {}
             ),
         }
-        for f, t, fmt in zip(ft_fields, ft_types, ft_formats)
+        for f, t, fmt in zip(ft_fields, ft_types, ft_formats, strict=False)
         if f and t
     }
     if ft_dict:
@@ -209,7 +209,7 @@ def view_config(filename):
     ):
         abort(404)
     try:
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             config_content = f.read()
         return render_template(
             "view_config.html", filename=safe_filename, content=config_content
@@ -486,7 +486,7 @@ def configure_scraper():
                 f_sels = request.form.getlist("field_selector[]")
                 f_attrs = request.form.getlist("field_attr[]")
                 valid_field = False
-                for n, s, a in zip(f_names, f_sels, f_attrs):
+                for n, s, a in zip(f_names, f_sels, f_attrs, strict=False):
                     n = n.strip()
                     s = s.strip()
                     a = a.strip()

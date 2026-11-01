@@ -1,22 +1,19 @@
 #!/usr/bin/env python3
-import time
 import logging
+import time
 from abc import ABC, abstractmethod
-from urllib.parse import urlparse, urljoin
+from typing import Any
+from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
-from typing import Dict, List, Optional, Any, Set
 
 import requests
-from requests.exceptions import ProxyError, Timeout, HTTPError, RequestException
-from bs4 import (
-    BeautifulSoup,
-)
+from requests.exceptions import HTTPError, ProxyError, RequestException, Timeout
 
 from .data_processor import DataProcessor
 from .utils.proxy_rotator import ProxyRotator
 
 
-def _proxy_to_str(proxy_dict: Optional[Dict]) -> str:
+def _proxy_to_str(proxy_dict: dict | None) -> str:
     """Helper to get a display string for a proxy dict."""
     if not proxy_dict:
         return "None"
@@ -39,7 +36,7 @@ class BaseScraper(ABC):
     - Retry logic for fetching pages.
     """
 
-    def __init__(self, config: Dict):
+    def __init__(self, config: dict):
         """
         Initializes the BaseScraper.
 
@@ -65,8 +62,8 @@ class BaseScraper(ABC):
         self.logger.debug(f"Using User-Agent: {self.session.headers['User-Agent']}")
 
         # Initialize robot parser conditionally
-        self.robot_parser: Optional[RobotFileParser] = None
-        self._robots_txt_domain: Optional[str] = (
+        self.robot_parser: RobotFileParser | None = None
+        self._robots_txt_domain: str | None = (
             None  # Track current domain for robots.txt
         )
         if config.get("respect_robots", True):
@@ -82,7 +79,7 @@ class BaseScraper(ABC):
         )  # Ensure float
 
         # Statistics tracking dictionary
-        self.stats: Dict[str, Any] = {
+        self.stats: dict[str, Any] = {
             "start_time": time.time(),
             "end_time": None,
             "total_duration": 0,
@@ -99,7 +96,7 @@ class BaseScraper(ABC):
         self.processing_rules = config.get("processing_rules", {})
 
         # Proxy rotation setup
-        self.proxy_rotator: Optional[ProxyRotator] = None
+        self.proxy_rotator: ProxyRotator | None = None
         proxies_list = config.get("proxies", [])
         if proxies_list:
             self.logger.info(
@@ -200,7 +197,17 @@ class BaseScraper(ABC):
         # Update last request time *after* potential sleep
         self.last_request_time = time.time()
 
-    def fetch_page(self, url: str, max_retries: Optional[int] = None) -> Optional[str]:
+    def fetch_page(
+        self,
+        url: str,
+        max_retries: int | None = None,
+        *,
+        method: str = "GET",
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        json_body: dict[str, Any] | None = None,
+        data_body: str | None = None,
+    ) -> str | None:
         """
         Fetches the content of a URL using the configured session,
         handling robots.txt, throttling, proxy rotation, and retries.
@@ -208,6 +215,11 @@ class BaseScraper(ABC):
         Args:
             url: The URL to fetch.
             max_retries: Override the default max retries from config.
+            method: HTTP method, defaulting to GET.
+            params: Optional query parameters.
+            headers: Optional request headers.
+            json_body: Optional JSON request body.
+            data_body: Optional raw request body.
 
         Returns:
             The text content of the page if successful, otherwise None.
@@ -227,8 +239,8 @@ class BaseScraper(ABC):
             # 2. Throttle request before making it
             self.throttle_requests()
 
-            current_proxy: Optional[Dict] = None
-            proxies_to_use: Optional[Dict] = None
+            current_proxy: dict | None = None
+            proxies_to_use: dict | None = None
 
             # 3. Get proxy if rotator is enabled
             if self.proxy_rotator:
@@ -249,11 +261,20 @@ class BaseScraper(ABC):
 
             # 4. Make the request
             try:
-                response = self.session.get(
-                    url,
-                    timeout=self.config.get("page_load_timeout", 30),
-                    proxies=proxies_to_use,  # Use the selected proxy (or empty dict for direct)
-                )
+                request_kwargs: dict[str, Any] = {
+                    "timeout": self.config.get("page_load_timeout", 30),
+                    "proxies": proxies_to_use,
+                }
+                if params is not None:
+                    request_kwargs["params"] = params
+                if headers is not None:
+                    request_kwargs["headers"] = headers
+                if json_body is not None:
+                    request_kwargs["json"] = json_body
+                if data_body is not None:
+                    request_kwargs["data"] = data_body
+
+                response = self.session.request(method, url, **request_kwargs)
                 response.raise_for_status()  # Raise HTTPError for bad status codes (4xx or 5xx)
 
                 # Success
@@ -322,7 +343,7 @@ class BaseScraper(ABC):
         self.session.proxies = {}
         return None
 
-    def _process_extracted_data(self, data: List[Dict]) -> List[Dict]:
+    def _process_extracted_data(self, data: list[dict]) -> list[dict]:
         """
         Applies processing rules to the extracted data using the DataProcessor.
 
@@ -349,7 +370,7 @@ class BaseScraper(ABC):
         return processed_data
 
     @abstractmethod
-    def extract_data(self, content: Any, url: str) -> List[Dict]:
+    def extract_data(self, content: Any, url: str) -> list[dict]:
         """
         Abstract method to extract data from fetched content.
 
@@ -366,7 +387,7 @@ class BaseScraper(ABC):
         pass
 
     @abstractmethod
-    def run(self) -> Dict:
+    def run(self) -> dict:
         """
         Abstract method to execute the entire scraping job.
 
@@ -393,7 +414,7 @@ class BaseScraper(ABC):
         # return {'data': processed_data, 'stats': self.get_stats(), 'config': self.config}
         pass
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """Calculates final duration and returns the statistics dictionary."""
         if self.stats.get("start_time") and not self.stats.get("end_time"):
             # Ensure end_time is set if run finished but wasn't explicitly set

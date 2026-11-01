@@ -1,13 +1,15 @@
 import time  # Already imported in BaseScraper, but good for explicitness if used here
-import logging
+from typing import Any
 from urllib.parse import urljoin
-from typing import Dict, List, Optional, Any, Set
+
 from bs4 import BeautifulSoup
+
 from .base_scraper import BaseScraper
 
 # --- Import LXML ---
 try:
-    from lxml import etree, html as lxml_html  # Use lxml_html for fromstring for safety
+    from lxml import etree  # Use lxml_html for fromstring for safety
+    from lxml import html as lxml_html
 
     LXML_INSTALLED = True
 except ImportError:
@@ -25,7 +27,7 @@ class HTMLScraper(BaseScraper):
     and finding the next page URL for pagination.
     """
 
-    def __init__(self, config: Dict):
+    def __init__(self, config: dict):
         """
         Initializes the HTMLScraper.
 
@@ -35,9 +37,9 @@ class HTMLScraper(BaseScraper):
                     'pagination' keys relevant to HTML scraping.
         """
         super().__init__(config)  # Initializes self.logger among other things
-        self.selectors: Dict = config.get("selectors", {})
+        self.selectors: dict = config.get("selectors", {})
         self.selector_type: str = self.selectors.get("type", "css").lower()
-        self.pagination_config: Optional[Dict] = config.get("pagination")
+        self.pagination_config: dict | None = config.get("pagination")
 
         if self.selector_type == "xpath" and not LXML_INSTALLED:
             msg = "lxml library is required for XPath support in HTMLScraper, but it's not installed. Please run: pip install lxml"
@@ -51,7 +53,7 @@ class HTMLScraper(BaseScraper):
 
     def extract_data(
         self, html_content: str, url: str
-    ) -> List[Dict]:  # Renamed html to html_content
+    ) -> list[dict]:  # Renamed html to html_content
         """
         Extracts structured data from the provided HTML content.
         (This is existing method, ensure it's compatible with lxml elements if using XPath)
@@ -74,7 +76,7 @@ class HTMLScraper(BaseScraper):
             return []
 
         try:
-            elements: List[
+            elements: list[
                 Any
             ] = []  # Ensure elements is defined before conditional assignment
             # --- Select top-level item elements using either XPath or CSS ---
@@ -115,9 +117,9 @@ class HTMLScraper(BaseScraper):
             ):  # element_context is either BS4 Tag or lxml Element
                 item_data = {}
                 for field, selector_config in field_selectors.items():
-                    value: Optional[str] = None
-                    current_selector: Optional[str] = None
-                    attr: Optional[str] = None
+                    value: str | None = None
+                    current_selector: str | None = None
+                    attr: str | None = None
 
                     if isinstance(selector_config, str):
                         current_selector = selector_config
@@ -280,7 +282,7 @@ class HTMLScraper(BaseScraper):
 
         return items
 
-    def _find_next_page_url(self, html_content: str, current_url: str) -> Optional[str]:
+    def _find_next_page_url(self, html_content: str, current_url: str) -> str | None:
         if not self.pagination_config or not html_content:
             return None
 
@@ -376,13 +378,13 @@ class HTMLScraper(BaseScraper):
 
         return None
 
-    def run(self) -> Dict:
+    def run(self) -> dict:
         self.stats["start_time"] = time.time()
-        all_extracted_data: List[Dict] = []
+        all_extracted_data: list[dict] = []
 
         initial_urls = self.config.get("urls", [])
         if isinstance(initial_urls, str):  # Handle single URL string
-            urls_to_scrape: List[str] = [initial_urls]
+            urls_to_scrape: list[str] = [initial_urls]
         elif isinstance(initial_urls, list):
             urls_to_scrape = list(initial_urls)
         else:
@@ -391,7 +393,7 @@ class HTMLScraper(BaseScraper):
             )
             urls_to_scrape = []
 
-        scraped_urls: Set[str] = set()
+        scraped_urls: set[str] = set()
 
         max_pages = float("inf")
         if self.pagination_config:

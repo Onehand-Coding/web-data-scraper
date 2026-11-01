@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock
+
 from web_data_scraper.scraper.api_scraper import APIScraper
 
 
@@ -32,3 +32,30 @@ def test_api_scraper_fetch(api_scraper_config, mocker):
 
     # Verify that fetch_page was called with the correct URL
     mock_fetch_page.assert_called_with("https://api.example.com/users")
+
+
+def test_api_scraper_post_sends_json_body(api_scraper_config, mocker):
+    config = dict(api_scraper_config)
+    config["api_config"] = {
+        **api_scraper_config["api_config"],
+        "method": "POST",
+        "params": {"page": 1},
+        "headers": {"X-Test": "yes"},
+        "data": {"query": "value"},
+    }
+    mock_fetch_page = mocker.patch(
+        "web_data_scraper.scraper.base_scraper.BaseScraper.fetch_page"
+    )
+    mock_fetch_page.return_value = '[{"user": {"id": 1, "name": "Test User"}}]'
+
+    scraper = APIScraper(config)
+    scraper.run()
+
+    mock_fetch_page.assert_called_with(
+        "https://api.example.com/users",
+        method="POST",
+        params={"page": 1},
+        headers={"X-Test": "yes"},
+        json_body={"query": "value"},
+        data_body=None,
+    )

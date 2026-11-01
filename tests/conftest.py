@@ -1,7 +1,5 @@
 import pytest
 import yaml
-from pathlib import Path
-from web_data_scraper.scraper.utils.config_loader import ConfigLoader
 
 
 @pytest.fixture

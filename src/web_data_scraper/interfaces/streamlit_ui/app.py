@@ -1,26 +1,24 @@
 #!/usr/bin/env python3
-import os
-import sys
-import time
 import json
-import yaml
 import logging
-from pathlib import Path
+import time
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import yaml
 from jsonschema import ValidationError as JsonSchemaValidationError
 
 from web_data_scraper.config import ROOT_DIR
-from web_data_scraper.scraper.utils.logger import setup_logging
-from web_data_scraper.scraper.utils.config_loader import ConfigLoader
-from web_data_scraper.scraper.html_scraper import HTMLScraper
-from web_data_scraper.scraper.dynamic_scraper import DynamicScraper
 from web_data_scraper.scraper.api_scraper import APIScraper
+from web_data_scraper.scraper.dynamic_scraper import DynamicScraper
+from web_data_scraper.scraper.html_scraper import HTMLScraper
 from web_data_scraper.scraper.storage.csv_handler import CSVStorage
 from web_data_scraper.scraper.storage.json_handler import JSONStorage
 from web_data_scraper.scraper.storage.sqlite_handler import SQLiteStorage
+from web_data_scraper.scraper.utils.config_loader import ConfigLoader
+from web_data_scraper.scraper.utils.logger import setup_logging
 
 CONFIG_DIR = ROOT_DIR / "configs" / "scraping_jobs"
 EXAMPLE_CONFIG_DIR = ROOT_DIR / "configs" / "example_templates"
@@ -101,7 +99,7 @@ def get_config_files_details(directory: Path) -> list:
 def timestamp_to_datetime_str(timestamp):
     try:
         return datetime.fromtimestamp(float(timestamp)).strftime("%Y-%m-%d %H:%M:%S")
-    except:
+    except Exception:
         return "N/A"
 
 
@@ -789,7 +787,7 @@ if st.session_state.current_page == "📋 Manage Jobs":
                     f"Viewing Configuration: {config_item['filename']}", expanded=True
                 ):
                     try:
-                        with open(config_item["path"], "r", encoding="utf-8") as f:
+                        with open(config_item["path"], encoding="utf-8") as f:
                             st.code(f.read(), language="yaml")
                     except Exception as e:
                         st.error(
@@ -871,7 +869,7 @@ elif st.session_state.current_page == "🚀 Example Jobs":
             )
         else:
             for example in example_files:
-                st.markdown(f"---")
+                st.markdown("---")
                 # Use columns for example name and actions in one row
                 col_ex_info, col_ex_actions_icons_container = st.columns([0.7, 0.3])
                 with col_ex_info:
@@ -947,7 +945,7 @@ elif st.session_state.current_page == "🚀 Example Jobs":
                 f"Viewing YAML: {example_to_view['display_name']}", expanded=True
             ):
                 try:
-                    with open(example_to_view["path"], "r", encoding="utf-8") as f:
+                    with open(example_to_view["path"], encoding="utf-8") as f:
                         st.code(f.read(), language="yaml")
                 except Exception as e:
                     st.error(
@@ -994,7 +992,7 @@ elif st.session_state.current_page == "➕ Create/Edit Job":
     elif (
         not st.session_state.config_to_edit
         and fv.get("existing_config_filename")
-        and not "(Copy)" in fv.get("form_job_name", "")
+        and "(Copy)" not in fv.get("form_job_name", "")
     ):
         st.session_state.form_values = get_default_form_values()
 
@@ -1131,7 +1129,7 @@ elif st.session_state.current_page == "➕ Create/Edit Job":
             selector_widget_key = f"web_field_selector_key_final_{field_id}"
             attr_widget_key = f"web_field_attr_key_final_{field_id}"
             cols_fields[0].text_input(
-                f"Field Name*",
+                "Field Name*",
                 value=field_item.get("name", ""),
                 key=name_widget_key,
                 placeholder=f"e.g., title_{i + 1}",
@@ -1145,7 +1143,7 @@ elif st.session_state.current_page == "➕ Create/Edit Job":
                 else "XPath expression (e.g., //h2[@class='product-title'], //span[contains(@class,'price')])"
             )
             cols_fields[1].text_input(
-                f"Selector*",
+                "Selector*",
                 value=field_item.get("selector", ""),
                 key=selector_widget_key,
                 placeholder=sel_help_text,
@@ -1154,7 +1152,7 @@ elif st.session_state.current_page == "➕ Create/Edit Job":
                 args=("form_fields_list", i, "selector", selector_widget_key),
             )
             cols_fields[2].text_input(
-                f"Attribute",
+                "Attribute",
                 value=field_item.get("attr", ""),
                 key=attr_widget_key,
                 placeholder="e.g., href, src, data-id",
@@ -1163,7 +1161,7 @@ elif st.session_state.current_page == "➕ Create/Edit Job":
                 help="Optional: If you want an HTML attribute's value (like 'href' from an <a> tag or 'src' from an <img> tag), enter the attribute name here. Leave blank to get the element's text content.",
             )
             if cols_fields[3].button(
-                f"➖",
+                "➖",
                 key=f"remove_web_field_btn_v7_final_{field_id}",
                 help="Remove this field definition",
             ):
@@ -1189,10 +1187,10 @@ elif st.session_state.current_page == "➕ Create/Edit Job":
             output_widget_key = f"api_map_output_key_final_{map_id}"
             source_widget_key = f"api_map_source_key_final_{map_id}"
             cols_map[0].text_input(
-                f"Output Field Name*",
+                "Output Field Name*",
                 value=map_item.get("output_name", ""),
                 key=output_widget_key,
-                placeholder=f"e.g., userId, productTitle",
+                placeholder="e.g., userId, productTitle",
                 on_change=update_list_item_from_widget,
                 args=(
                     "form_api_field_mappings_list",
@@ -1203,7 +1201,7 @@ elif st.session_state.current_page == "➕ Create/Edit Job":
                 help="The name this field will have in your final output data.",
             )
             cols_map[1].text_input(
-                f"API Source Field*",
+                "API Source Field*",
                 value=map_item.get("source_name", ""),
                 key=source_widget_key,
                 placeholder="e.g., id, user.profile.name",
@@ -1217,7 +1215,7 @@ elif st.session_state.current_page == "➕ Create/Edit Job":
                 help="The key (or dot.notation path for nested objects) of this field in the API's JSON response item.",
             )
             if cols_map[2].button(
-                f"➖",
+                "➖",
                 key=f"remove_api_map_btn_v7_final_{map_id}",
                 help="Remove this API field mapping",
             ):
@@ -1259,7 +1257,7 @@ elif st.session_state.current_page == "➕ Create/Edit Job":
             help="Full HTTPS proxy URL. Often the same as HTTP for many providers.",
         )
         if p_cols[2].button(
-            f"➖", key=f"remove_proxy_btn_v7_final_{proxy_id}", help="Remove this proxy"
+            "➖", key=f"remove_proxy_btn_v7_final_{proxy_id}", help="Remove this proxy"
         ):
             fv["form_proxies_list"].pop(i)
             st.rerun()
@@ -1901,7 +1899,7 @@ elif st.session_state.current_page == "➕ Create/Edit Job":
             }
             proxies_to_save = []
             proxy_warning_issued_this_save = False
-            for i_proxy, p_item_proxy in enumerate(fv.get("form_proxies_list", [])):
+            for _i_proxy, p_item_proxy in enumerate(fv.get("form_proxies_list", [])):
                 http_val_proxy = p_item_proxy.get("http", "").strip()
                 https_val_proxy = p_item_proxy.get("https", "").strip()
                 proxy_entry_save = {}

@@ -2,17 +2,15 @@
 Abstract base class for storage handlers.
 """
 
-from abc import ABC, abstractmethod
-from typing import List, Dict
-import os
-from pathlib import Path
 import logging
+from abc import ABC, abstractmethod
+from pathlib import Path
 
 
 class BaseStorage(ABC):
     """Base class for data storage handlers."""
 
-    def __init__(self, config: Dict):
+    def __init__(self, config: dict):
         self.config = config
         self.logger = logging.getLogger(__name__)
         self.output_dir = self._get_output_dir()
@@ -24,7 +22,7 @@ class BaseStorage(ABC):
         return output_dir
 
     @abstractmethod
-    def save(self, data: List[Dict], filename: str = None) -> str:
+    def save(self, data: list[dict], filename: str = None) -> str:
         """Save data to storage."""
         pass
 

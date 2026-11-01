@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-import yaml
 import logging
 from pathlib import Path
-from typing import Dict, Any, List, Optional
-from jsonschema import validate, ValidationError
+from typing import Any
+
+import yaml
+from jsonschema import ValidationError, validate
 
 # --- API Config Schema ---
 API_CONFIG_SCHEMA = {
@@ -397,7 +398,7 @@ class ConfigLoader:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    def load_config(self, config_path: str) -> Dict[str, Any]:
+    def load_config(self, config_path: str) -> dict[str, Any]:
         config = {}
         try:
             config = self._load_yaml(config_path)
@@ -424,11 +425,11 @@ class ConfigLoader:
             )
             raise
 
-    def _load_yaml(self, file_path: str) -> Dict[str, Any]:
-        with open(file_path, "r", encoding="utf-8") as f:
+    def _load_yaml(self, file_path: str) -> dict[str, Any]:
+        with open(file_path, encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
 
-    def validate_config(self, config: Dict[str, Any]) -> bool:
+    def validate_config(self, config: dict[str, Any]) -> bool:
         validate(instance=config, schema=self.CONFIG_SCHEMA)
         if "login_config" in config and not config.get("dynamic", False):
             self.logger.warning(
@@ -438,8 +439,8 @@ class ConfigLoader:
         return True
 
     def generate_sample_config(
-        self, output_filename_base: Optional[str] = None
-    ) -> List[str]:
+        self, output_filename_base: str | None = None
+    ) -> list[str]:
         """
         Generates sample configuration files (one for web, one for API)
         and saves them to a 'configs/generated_samples/' subdirectory.

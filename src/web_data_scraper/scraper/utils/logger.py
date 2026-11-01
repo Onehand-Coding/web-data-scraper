@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-import sys
 import logging
-from pathlib import Path
-from typing import Optional
+import sys
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 from web_data_scraper.config import ROOT_DIR
 
@@ -11,12 +10,12 @@ LOGS_DIR = ROOT_DIR / "logs"
 
 
 def setup_logging(
-    log_filename: Optional[str] = "scraper.log",  # Default filename within logs dir
+    log_filename: str | None = "scraper.log",  # Default filename within logs dir
     log_dir: Path = LOGS_DIR,  # Use the defined logs directory
     max_bytes: int = 10 * 1024 * 1024,  # 10MB
     backup_count: int = 5,
     level: int = logging.INFO,
-    console_level: Optional[int] = None,  # Allow different level for console
+    console_level: int | None = None,  # Allow different level for console
 ) -> None:
     """Configure logging for the application."""
     log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

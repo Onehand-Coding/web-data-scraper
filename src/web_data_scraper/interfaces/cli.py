@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
-import time
-import yaml
-import typer
 import logging
 from pathlib import Path
-from typing import Optional, List
 
+import typer
+import yaml
 from jsonschema import ValidationError
 
 from web_data_scraper.config import ROOT_DIR
 from web_data_scraper.scraper.api_scraper import APIScraper
-from web_data_scraper.scraper.html_scraper import HTMLScraper
 from web_data_scraper.scraper.dynamic_scraper import DynamicScraper
+from web_data_scraper.scraper.html_scraper import HTMLScraper
 from web_data_scraper.scraper.storage.csv_handler import CSVStorage
 from web_data_scraper.scraper.storage.json_handler import JSONStorage
 from web_data_scraper.scraper.storage.sqlite_handler import SQLiteStorage
-from web_data_scraper.scraper.utils.logger import setup_logging
 from web_data_scraper.scraper.utils.config_loader import ConfigLoader
+from web_data_scraper.scraper.utils.logger import setup_logging
 
 LOG_FILE = ROOT_DIR / "logs" / "cli_scraper.log"
 
@@ -28,7 +26,7 @@ logger_cli = logging.getLogger(__name__)
 # --- run_scraper command ---
 @app.command("run")
 def run_scraper(
-    config_file: Path = typer.Argument(
+    config_file: Path = typer.Argument(  # noqa: B008
         ...,
         help="Path to config YAML file",
         exists=True,
@@ -107,7 +105,7 @@ def run_scraper(
 
         if result.get("data"):
             output_path = storage.save(result["data"])
-            typer.echo(f"\nScraping completed successfully!")
+            typer.echo("\nScraping completed successfully!")
             typer.echo(f"Results saved to: {output_path}")
             typer.echo(f"Statistics: {result.get('stats', {})}")
         else:
@@ -117,20 +115,20 @@ def run_scraper(
     except (ValidationError, yaml.YAMLError) as e:
         logger_cli.error(f"Configuration Error in {config_file}: {e}", exc_info=False)
         typer.echo(f"Configuration Error in {config_file}: {e}", err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     except FileNotFoundError as e:
         logger_cli.error(f"Configuration file not found: {e}")
         typer.echo(f"Error: Config file not found at '{config_file}'", err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     except Exception as e:
         logger_cli.exception(f"An unexpected error occurred during scraping: {e}")
         typer.echo(f"\nScraping failed with an unexpected error: {e}", err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @app.command("generate-config")
 def generate_config_command(  # Renamed from generate_config to avoid conflict if imported elsewhere
-    filename_base: Optional[str] = typer.Argument(
+    filename_base: str | None = typer.Argument(
         None,  # Default to None, so ConfigLoader uses its internal defaults
         help="Optional base name for the generated web config file (e.g., 'my_scraper'). "
         "API config will be named similarly. Files are saved in 'configs/generated_samples/'.",
@@ -146,7 +144,7 @@ def generate_config_command(  # Renamed from generate_config to avoid conflict i
     try:
         # The ConfigLoader.generate_sample_config method now handles directory creation
         # and default naming if filename_base is None.
-        generated_files: List[str] = config_loader_cli_instance.generate_sample_config(
+        generated_files: list[str] = config_loader_cli_instance.generate_sample_config(
             filename_base
         )
 
@@ -163,7 +161,7 @@ def generate_config_command(  # Renamed from generate_config to avoid conflict i
     except Exception as e:
         logger_cli.exception(f"Failed to generate config file(s): {e}")
         typer.echo(f"Failed to generate sample configs: {e}", err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 if __name__ == "__main__":

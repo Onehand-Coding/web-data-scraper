@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import random
-from typing import List, Dict
 
 # Common user agents for different browsers and devices
 USER_AGENTS = {
@@ -32,7 +31,7 @@ USER_AGENTS = {
 class UserAgentManager:
     """Manages user agent strings for requests."""
 
-    def __init__(self, agents: Dict = None):
+    def __init__(self, agents: dict = None):
         """Initialize with custom user agents if provided."""
         self.user_agents = agents or USER_AGENTS
 
@@ -47,7 +46,7 @@ class UserAgentManager:
                 all_agents.extend(agents)
             return random.choice(all_agents)
 
-    def get_user_agents(self, device_type: str = None) -> List[str]:
+    def get_user_agents(self, device_type: str = None) -> list[str]:
         """Get list of user agents for a specific device type."""
         if device_type and device_type in self.user_agents:
             return self.user_agents[device_type]

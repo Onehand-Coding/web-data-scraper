@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-import re
-import json
 import logging
-from typing import Dict, List, Any, Optional
-from datetime import datetime, date
+import re
+from datetime import date, datetime
+from typing import Any
 
 
 # Helper function for nested access (if not imported from a shared utils module)
 # Consider moving this to a utils module if used elsewhere
 def get_nested_value(
-    data_dict: Optional[Dict | List], key_path: str, default: Any = None
+    data_dict: dict | list | None, key_path: str, default: Any = None
 ) -> Any:
     """
     Accesses a value in a nested structure (dict or list) using a dot-separated key path.
@@ -92,7 +91,7 @@ class DataProcessor:
     - Dropping specified fields
     """
 
-    def __init__(self, config: Dict = None):
+    def __init__(self, config: dict = None):
         """
         Initializes the DataProcessor.
 
@@ -104,7 +103,7 @@ class DataProcessor:
         self.config = config or {}
         self.logger = logging.getLogger(__name__)  # Get logger specific to this module
 
-    def process(self, data: List[Dict], rules: Optional[Dict] = None) -> List[Dict]:
+    def process(self, data: list[dict], rules: dict | None = None) -> list[dict]:
         """
         Applies all configured processing rules to a list of scraped items.
 
@@ -166,7 +165,7 @@ class DataProcessor:
         self.logger.info(f"Finished processing. {len(processed_data)} items resulted.")
         return processed_data
 
-    def _process_item(self, item: Dict, rules: Dict) -> Dict:
+    def _process_item(self, item: dict, rules: dict) -> dict:
         """
         Applies the sequence of processing rules to a single item dictionary.
 
@@ -263,7 +262,7 @@ class DataProcessor:
 
         return item
 
-    def _convert_type(self, value: Any, type_info: Dict) -> Any:
+    def _convert_type(self, value: Any, type_info: dict) -> Any:
         """
         Attempts to convert a value to the specified target type.
 
@@ -391,7 +390,7 @@ class DataProcessor:
             )
             return None
 
-    def _clean_text(self, text: str, rules: Dict) -> str:
+    def _clean_text(self, text: str, rules: dict) -> str:
         """
         Applies various text cleaning operations based on the provided rules.
 
@@ -455,7 +454,7 @@ class DataProcessor:
         return cleaned_text
 
     def _validate_field(
-        self, value: Any, validation: Dict, field_name_for_log: str = "?"
+        self, value: Any, validation: dict, field_name_for_log: str = "?"
     ) -> bool:
         """
         Validates a single field's value against specified rules.
